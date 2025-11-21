@@ -1,9 +1,9 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const adminController = require('../controllers/AdminController');
-const settingController = require('../controllers/SettingController');
-const eventController = require('../controllers/EventController');
-const verifyToken = require('../middlewares/AuthMiddleware');
+const adminController = require("../controllers/AdminController");
+const settingController = require("../controllers/SettingController");
+const eventController = require("../controllers/EventController");
+const verifyToken = require("../middlewares/AuthMiddleware");
 const { requirePermission } = require("../middlewares/iamMiddleware");
 const { PERMISSIONS } = require("../config/iamConfig");
 
@@ -57,34 +57,34 @@ router.delete(
 
 // System settings routes
 router.get(
-  '/settings', 
-  verifyToken, 
+  "/settings",
+  verifyToken,
   requirePermission(PERMISSIONS.SETTINGS_VIEW),
   settingController.getSettings
 );
 router.put(
-  '/settings', 
-  verifyToken, 
+  "/settings",
+  verifyToken,
   requirePermission(PERMISSIONS.SETTINGS_UPDATE),
   settingController.updateSettings
 );
 
 // Calendar event routes
 router.get(
-  '/events', 
-  verifyToken, 
+  "/events",
+  verifyToken,
   requirePermission(PERMISSIONS.EVENTS_READ),
   eventController.getEvents
 );
 router.post(
-  '/events', 
-  verifyToken, 
+  "/events",
+  verifyToken,
   requirePermission(PERMISSIONS.EVENTS_CREATE),
   eventController.createEvent
 );
 router.delete(
-  '/events/:id', 
-  verifyToken, 
+  "/events/:id",
+  verifyToken,
   requirePermission(PERMISSIONS.EVENTS_DELETE),
   eventController.deleteEvent
 );

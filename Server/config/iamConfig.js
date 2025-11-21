@@ -5,31 +5,31 @@
 
 const PERMISSIONS = {
   // User Management
-  USERS_READ: 'users:read',
-  USERS_CREATE: 'users:create',
-  USERS_UPDATE: 'users:update',
-  USERS_DELETE: 'users:delete',
-  USERS_MANAGE_ROLES: 'users:manage_roles',
+  USERS_READ: "users:read",
+  USERS_CREATE: "users:create",
+  USERS_UPDATE: "users:update",
+  USERS_DELETE: "users:delete",
+  USERS_MANAGE_ROLES: "users:manage_roles",
 
   // Message Management
-  MESSAGES_READ: 'messages:read',
-  MESSAGES_DELETE: 'messages:delete',
-  
+  MESSAGES_READ: "messages:read",
+  MESSAGES_DELETE: "messages:delete",
+
   // Dashboard
-  DASHBOARD_VIEW: 'dashboard:view',
+  DASHBOARD_VIEW: "dashboard:view",
 
   // Settings
-  SETTINGS_VIEW: 'settings:view',
-  SETTINGS_UPDATE: 'settings:update',
+  SETTINGS_VIEW: "settings:view",
+  SETTINGS_UPDATE: "settings:update",
 
   // Events
-  EVENTS_READ: 'events:read',
-  EVENTS_CREATE: 'events:create',
-  EVENTS_DELETE: 'events:delete',
-  
+  EVENTS_READ: "events:read",
+  EVENTS_CREATE: "events:create",
+  EVENTS_DELETE: "events:delete",
+
   // System
-  SYSTEM_MAINTENANCE: 'system:maintenance',
-  MAINTENANCE_BYPASS: 'maintenance:bypass',
+  SYSTEM_MAINTENANCE: "system:maintenance",
+  MAINTENANCE_BYPASS: "maintenance:bypass",
 };
 
 const ROLES = {
@@ -55,10 +55,10 @@ const ROLES = {
     // but we can define explicit system permissions here if needed.
     // For now, they might just have read access to public events.
     PERMISSIONS.EVENTS_READ,
-  ]
+  ],
 };
 
 module.exports = {
   PERMISSIONS,
-  ROLES
+  ROLES,
 };

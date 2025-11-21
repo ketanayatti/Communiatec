@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useStore } from '@/store/store';
-import apiClient from '@/lib/apiClient';
-import { toast } from 'sonner';
-import { motion } from 'framer-motion';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useStore } from "@/store/store";
+import apiClient from "@/lib/apiClient";
+import { toast } from "sonner";
+import { motion } from "framer-motion";
 import {
   Search,
   ChevronLeft,
@@ -20,7 +20,7 @@ import {
   MoreVertical,
   Crown,
   User,
-  Settings
+  Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

@@ -19,7 +19,21 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # Ensure the script is executable
-            chmod +x ~/Communiatec/scripts/update-app.sh
-            # Run the update script
-            ~/Communiatec/scripts/update-app.sh
+            # 1. Install Dependencies if Node is missing (First time setup)
+            if ! command -v node &> /dev/null; then
+                echo "Installing Node.js and dependencies..."
+                curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+                sudo apt-get update
+                sudo apt-get install -y nodejs nginx git
+                sudo npm install -g pm2
+            fi
+
+            # 2. Clone Repo if missing
+            if [ ! -d "$HOME/Communiatec" ]; then
+                echo "Cloning repository..."
+                git clone https://github.com/ketanayatti/Communiatec.git $HOME/Communiatec
+            fi
+
+            # 3. Run Update Script
+            chmod +x $HOME/Communiatec/scripts/update-app.sh
+            $HOME/Communiatec/scripts/update-app.sh

@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useStore } from '@/store/store';
-import apiClient from '@/lib/apiClient';
-import { toast } from 'sonner';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useStore } from "@/store/store";
+import apiClient from "@/lib/apiClient";
+import { toast } from "sonner";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Users,
   User,
@@ -21,10 +21,16 @@ import {
   Globe,
   Eye,
   ChevronRight,
-  Crown
+  Crown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -68,7 +74,7 @@ const Dashboard = () => {
       gradient: "from-cyan-500 to-blue-600",
       shadowColor: "cyan-500/25",
       count: stats?.totalUsers || 0,
-      metric: "users"
+      metric: "users",
     },
     {
       title: "Event Calendar",
@@ -78,7 +84,7 @@ const Dashboard = () => {
       gradient: "from-indigo-500 to-purple-600",
       shadowColor: "indigo-500/25",
       count: stats?.upcomingEvents || 0,
-      metric: "events"
+      metric: "events",
     },
     {
       title: "System Settings",
@@ -87,7 +93,7 @@ const Dashboard = () => {
       onClick: () => navigate("/admin/settings"),
       gradient: "from-emerald-500 to-teal-600",
       shadowColor: "emerald-500/25",
-      metric: "configs"
+      metric: "configs",
     },
   ];
 

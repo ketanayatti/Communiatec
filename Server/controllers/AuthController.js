@@ -8,8 +8,10 @@ const {
   logFailedAuth,
   validatePasswordStrength,
 } = require("../middlewares/securityAudit");
-const { loginSchema, resetPasswordSchema } = require("../lib/validators/authValidators");
-
+const {
+  loginSchema,
+  resetPasswordSchema,
+} = require("../lib/validators/authValidators");
 
 const logIn = async (req, res) => {
   try {
@@ -23,7 +25,6 @@ const logIn = async (req, res) => {
     }
 
     const { email, password } = req.body;
-
 
     const data = await User.findOne({ email });
 
@@ -66,17 +67,17 @@ const logIn = async (req, res) => {
     );
 
     // Set cookie with appropriate settings for production/cross-domain
-    const isProduction = process.env.NODE_ENV === 'production';
+    const isProduction = process.env.NODE_ENV === "production";
     const cookieOptions = {
       httpOnly: true,
       secure: isProduction, // Use secure cookies in production
-      sameSite: isProduction ? 'none' : 'lax', // 'none' for cross-domain in production
+      sameSite: isProduction ? "none" : "lax", // 'none' for cross-domain in production
       maxAge: 3 * 24 * 60 * 60 * 1000, // 3 days in milliseconds
     };
-    
+
     res.cookie("token", token, cookieOptions);
-    
-    console.log('🍪 Cookie set with options:', cookieOptions);
+
+    console.log("🍪 Cookie set with options:", cookieOptions);
 
     console.log(`✅ User logged in: ${data.email} (Role: ${data.role})`);
 
@@ -166,14 +167,14 @@ const logOut = async (req, res) => {
     );
 
     // Clear cookie with the same attributes used when setting it
-    const isProduction = process.env.NODE_ENV === 'production';
+    const isProduction = process.env.NODE_ENV === "production";
     const cookieOptions = {
       httpOnly: true,
       secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
+      sameSite: isProduction ? "none" : "lax",
       path: "/",
     };
-    
+
     res.clearCookie("token", cookieOptions);
 
     // Also try clearing without specifying attributes (fallback)
@@ -252,14 +253,14 @@ const githubCallback = async (req, res) => {
     );
 
     // Set cookie with proper cross-domain settings
-    const isProduction = process.env.NODE_ENV === 'production';
+    const isProduction = process.env.NODE_ENV === "production";
     const cookieOptions = {
       httpOnly: true,
       secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
+      sameSite: isProduction ? "none" : "lax",
       maxAge: 3 * 24 * 60 * 60 * 1000,
     };
-    
+
     res.cookie("token", token, cookieOptions);
 
     // Redirect to your frontend app with token in URL for cross-domain auth
@@ -273,7 +274,9 @@ const githubCallback = async (req, res) => {
 
 const linkedinAuth = (req, res) => {
   const baseUrl = process.env.SERVER_URL || "http://localhost:4000";
-  const redirectUri = encodeURIComponent(`${baseUrl}/api/auth/linkedin/callback`);
+  const redirectUri = encodeURIComponent(
+    `${baseUrl}/api/auth/linkedin/callback`
+  );
   const clientId = process.env.LINKEDIN_CLIENT_ID;
   const state = "randomstatestring";
   const scope = "openid profile email";
@@ -332,14 +335,14 @@ const linkedinCallback = async (req, res) => {
     );
 
     // Set cookie with proper cross-domain settings
-    const isProduction = process.env.NODE_ENV === 'production';
+    const isProduction = process.env.NODE_ENV === "production";
     const cookieOptions = {
       httpOnly: true,
       secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
+      sameSite: isProduction ? "none" : "lax",
       maxAge: 3 * 24 * 60 * 60 * 1000,
     };
-    
+
     res.cookie("token", token, cookieOptions);
 
     // Redirect to your frontend app with token in URL for cross-domain auth
@@ -428,5 +431,3 @@ module.exports = {
   linkedinCallback,
   resetPassword,
 };
-
-

@@ -1,6 +1,6 @@
-const jwt = require('jsonwebtoken');
-const User = require('../models/UserModel');
-const logger = require('../utils/logger');
+const jwt = require("jsonwebtoken");
+const User = require("../models/UserModel");
+const logger = require("../utils/logger");
 
 /**
  * Security Audit Middleware and Utilities
@@ -10,20 +10,20 @@ const logger = require('../utils/logger');
 // Security event logger
 const logSecurityEvent = (event, details, req = null) => {
   const timestamp = new Date().toISOString();
-  const ip = req?.ip || req?.connection?.remoteAddress || 'unknown';
-  const userAgent = req?.get('User-Agent') || 'unknown';
-  
+  const ip = req?.ip || req?.connection?.remoteAddress || "unknown";
+  const userAgent = req?.get("User-Agent") || "unknown";
+
   const logEntry = {
     event,
     ip,
     userAgent,
-    ...details
+    ...details,
   };
-  
+
   // Log to winston logger
-  if (details.severity === 'HIGH' || details.severity === 'CRITICAL') {
+  if (details.severity === "HIGH" || details.severity === "CRITICAL") {
     logger.error(`SECURITY EVENT: ${event}`, logEntry);
-  } else if (details.severity === 'MEDIUM') {
+  } else if (details.severity === "MEDIUM") {
     logger.warn(`SECURITY EVENT: ${event}`, logEntry);
   } else {
     logger.info(`SECURITY EVENT: ${event}`, logEntry);
@@ -175,40 +175,48 @@ const securityAuditMiddleware = (req, res, next) => {
 // Password strength validator
 const validatePasswordStrength = (password) => {
   const errors = [];
-  
+
   if (password.length < 8) {
-    errors.push('Password must be at least 8 characters long');
+    errors.push("Password must be at least 8 characters long");
   }
-  
+
   if (!/[A-Z]/.test(password)) {
-    errors.push('Password must contain at least one uppercase letter');
+    errors.push("Password must contain at least one uppercase letter");
   }
-  
+
   if (!/[a-z]/.test(password)) {
-    errors.push('Password must contain at least one lowercase letter');
+    errors.push("Password must contain at least one lowercase letter");
   }
-  
+
   if (!/\d/.test(password)) {
-    errors.push('Password must contain at least one number');
+    errors.push("Password must contain at least one number");
   }
-  
+
   if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-    errors.push('Password must contain at least one special character');
+    errors.push("Password must contain at least one special character");
   }
-  
+
   // Check for common weak passwords
   const commonPasswords = [
-    'password', '123456', 'password123', 'admin', 'qwerty',
-    'letmein', 'welcome', 'monkey', 'dragon', 'pass'
+    "password",
+    "123456",
+    "password123",
+    "admin",
+    "qwerty",
+    "letmein",
+    "welcome",
+    "monkey",
+    "dragon",
+    "pass",
   ];
-  
+
   if (commonPasswords.includes(password.toLowerCase())) {
-    errors.push('Password is too common, please choose a stronger password');
+    errors.push("Password is too common, please choose a stronger password");
   }
-  
+
   return {
     isValid: errors.length === 0,
-    errors
+    errors,
   };
 };
 
@@ -218,42 +226,50 @@ const checkSessionSecurity = async (req, res, next) => {
     try {
       // Verify user still exists and is active
       const user = await User.findById(req.user.id);
-      
+
       if (!user) {
-        logSecurityEvent('INVALID_SESSION', {
-          userId: req.user.id,
-          reason: 'User no longer exists',
-          severity: 'HIGH'
-        }, req);
-        
+        logSecurityEvent(
+          "INVALID_SESSION",
+          {
+            userId: req.user.id,
+            reason: "User no longer exists",
+            severity: "HIGH",
+          },
+          req
+        );
+
         return res.status(401).json({
           success: false,
-          message: 'Session invalid, please login again'
+          message: "Session invalid, please login again",
         });
       }
-      
+
       // Check if user's role was changed (potential privilege escalation)
       if (user.role !== req.user.role) {
-        logSecurityEvent('ROLE_CHANGE_DETECTED', {
-          userId: req.user.id,
-          oldRole: req.user.role,
-          newRole: user.role,
-          severity: 'HIGH'
-        }, req);
-        
+        logSecurityEvent(
+          "ROLE_CHANGE_DETECTED",
+          {
+            userId: req.user.id,
+            oldRole: req.user.role,
+            newRole: user.role,
+            severity: "HIGH",
+          },
+          req
+        );
+
         // Force re-authentication for role changes
         return res.status(401).json({
           success: false,
-          message: 'Account permissions changed, please login again'
+          message: "Account permissions changed, please login again",
         });
       }
-      
+
       req.currentUser = user; // Attach current user data
     } catch (error) {
-      console.error('Session security check error:', error);
+      console.error("Session security check error:", error);
     }
   }
-  
+
   next();
 };
 
@@ -268,5 +284,5 @@ module.exports = {
   logInputValidationFailure,
   securityAuditMiddleware,
   validatePasswordStrength,
-  checkSessionSecurity
+  checkSessionSecurity,
 };

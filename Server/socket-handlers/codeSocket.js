@@ -1,5 +1,5 @@
 // Server/socket-handlers/codeSocket.js
-const CodeSession = require('../models/CodeSessionModel');
+const CodeSession = require("../models/CodeSessionModel");
 
 const handleCodeCollaboration = (io) => {
   console.log("🖥️  Setting up code collaboration handlers...");
@@ -10,21 +10,22 @@ const handleCodeCollaboration = (io) => {
   codeNamespace.on("connection", (socket) => {
     console.log(`🔌 Code collaboration user connected: ${socket.id}`);
 
-  // Join code session
-  socket.on("join-code-session", async (data) => {
-    const { sessionId, user } = data;
-    const userId = (user._id || user.id)?.toString();
-    
-    // Set socket properties IMMEDIATELY before any async operations
-    socket.userId = userId;
-    socket.sessionId = sessionId;
-    socket.userInfo = user;
+    // Join code session
+    socket.on("join-code-session", async (data) => {
+      const { sessionId, user } = data;
+      const userId = (user._id || user.id)?.toString();
 
-    console.log("🔍 Debug user data:", {
-      userId: userId,
-      userObject: user,
-      socketId: socket.id
-    });      console.log(
+      // Set socket properties IMMEDIATELY before any async operations
+      socket.userId = userId;
+      socket.sessionId = sessionId;
+      socket.userInfo = user;
+
+      console.log("🔍 Debug user data:", {
+        userId: userId,
+        userObject: user,
+        socketId: socket.id,
+      });
+      console.log(
         `👤 User ${userId} (${user.firstName}) joining session: ${sessionId}`
       );
 
@@ -39,7 +40,7 @@ const handleCodeCollaboration = (io) => {
 
         // Join the new session room
         await socket.join(sessionId);
-        
+
         console.log(`✅ Socket ${socket.id} joined room ${sessionId}`);
 
         // Get or create session
@@ -149,7 +150,7 @@ const handleCodeCollaboration = (io) => {
       const { sessionId, code, changes, userId, timestamp } = data;
 
       // console.log(`📝 Code change from user ${userId} in session ${sessionId}`);
-      
+
       try {
         // Verify user is in this session
         if (socket.sessionId !== sessionId) {
@@ -158,23 +159,29 @@ const handleCodeCollaboration = (io) => {
           );
           // Attempt to auto-fix if session ID matches but socket property isn't set
           if (sessionId) {
-             socket.sessionId = sessionId;
-             socket.userId = userId;
-             socket.join(sessionId);
-             console.log(`🔧 Auto-fixed socket session/user ID for ${socket.id}`);
+            socket.sessionId = sessionId;
+            socket.userId = userId;
+            socket.join(sessionId);
+            console.log(
+              `🔧 Auto-fixed socket session/user ID for ${socket.id}`
+            );
           } else {
-             return;
+            return;
           }
         }
 
         // Additional verification - ensure the userId matches socket.userId
         // Use loose equality or string comparison to be safe
-        if (socket.userId && userId && socket.userId.toString() !== userId.toString()) {
+        if (
+          socket.userId &&
+          userId &&
+          socket.userId.toString() !== userId.toString()
+        ) {
           console.log(
             `⚠️  UserId mismatch: socket.userId=${socket.userId}, data.userId=${userId}`
           );
           // Don't return here, just log warning. Trust the socket connection for now if session matches.
-          // return; 
+          // return;
         }
 
         // Update code in database
@@ -209,7 +216,6 @@ const handleCodeCollaboration = (io) => {
         // Use the namespace to broadcast
         socket.to(sessionId).emit("code-update", updateData);
         // console.log(`📡 Broadcasted code update to other users in room ${sessionId}`);
-
       } catch (error) {
         console.error("❌ Code change error:", error);
         socket.emit("error", {

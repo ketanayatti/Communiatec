@@ -1,5 +1,5 @@
-const User = require('../models/UserModel');
-const Message = require('../models/MessageModel');
+const User = require("../models/UserModel");
+const Message = require("../models/MessageModel");
 const AdminAudit = require("../models/AdminAuditModel");
 const {
   createUserSchema,
@@ -75,7 +75,7 @@ exports.getDashboardStats = async (req, res) => {
 exports.createUser = async (req, res) => {
   try {
     const adminUserCheck = req.requestingUser || req.user;
-    
+
     // Validate input using Joi
     const { error, value } = createUserSchema.validate(req.body);
     if (error)
@@ -88,12 +88,10 @@ exports.createUser = async (req, res) => {
     // Check for existing user
     const existing = await User.findOne({ email });
     if (existing)
-      return res
-        .status(409)
-        .json({
-          success: false,
-          message: "User with this email already exists",
-        });
+      return res.status(409).json({
+        success: false,
+        message: "User with this email already exists",
+      });
 
     const newUser = new User({
       email,
@@ -188,12 +186,10 @@ exports.updateUserRole = async (req, res) => {
 
     // Prevent self-demotion
     if (userId === adminUserCheck._id.toString() && role !== "admin")
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "You cannot demote yourself from admin role",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "You cannot demote yourself from admin role",
+      });
 
     // Prevent removing last admin
     if (role !== "admin") {
@@ -201,12 +197,10 @@ exports.updateUserRole = async (req, res) => {
       if (targetUser && targetUser.role === "admin") {
         const adminCount = await User.countDocuments({ role: "admin" });
         if (adminCount <= 1) {
-          return res
-            .status(400)
-            .json({
-              success: false,
-              message: "Operation would remove the last admin",
-            });
+          return res.status(400).json({
+            success: false,
+            message: "Operation would remove the last admin",
+          });
         }
       }
     }
@@ -247,12 +241,10 @@ exports.deleteUser = async (req, res) => {
 
     // Prevent self-deletion
     if (userId === adminUserCheck._id.toString())
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "You cannot delete your own admin account",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "You cannot delete your own admin account",
+      });
 
     const targetUser = await User.findById(userId);
     if (!targetUser)
@@ -264,12 +256,10 @@ exports.deleteUser = async (req, res) => {
     if (targetUser.role === "admin") {
       const adminCount = await User.countDocuments({ role: "admin" });
       if (adminCount <= 1)
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message: "Operation would remove the last admin",
-          });
+        return res.status(400).json({
+          success: false,
+          message: "Operation would remove the last admin",
+        });
     }
 
     // Soft-delete approach could be added; for now perform hard delete and plan cleanup

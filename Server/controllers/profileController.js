@@ -8,7 +8,7 @@ const logger = require("../utils/logger");
 const updateProfile = async (req, res) => {
   try {
     const { id } = req;
-    
+
     // Validate input using Joi
     const { error } = updateProfileSchema.validate(req.body);
     if (error) {
@@ -92,7 +92,9 @@ const deleteImage = async (req, res) => {
     const userId = req.id;
     const user = await User.findById(userId);
     if (!user.image) {
-      logger.warn(`Delete image attempt failed: No image found for user ${userId}`);
+      logger.warn(
+        `Delete image attempt failed: No image found for user ${userId}`
+      );
       return res.status(400).json({ error: "No image found" });
     }
 
