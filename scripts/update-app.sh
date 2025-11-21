@@ -23,9 +23,33 @@ git pull origin master
 # 2. Update Server
 echo "🛠️ Updating Server..."
 cd Server
+
+# Ensure .env file exists with critical configuration
+if [ ! -f ".env" ]; then
+    echo "⚠️  .env file missing in Server, creating with defaults..."
+    cat > .env << 'ENVEOF'
+PORT=8000
+NODE_ENV=production
+REDIS_URL=disabled
+ALLOW_VERCEL_PREVIEWS=true
+ENVEOF
+    echo "   ⚠️  IMPORTANT: Update .env with your database and service credentials!"
+fi
+
+# Ensure PORT is set to 8000 for production
+if ! grep -q "^PORT=" .env; then
+    echo "PORT=8000" >> .env
+fi
+
 npm install
-# Restart PM2 process
-pm2 restart communiatec-server || pm2 start server.js --name "communiatec-server"
+# Restart PM2 process with environment variables
+export NODE_ENV=production
+export NODE_OPTIONS="--max-old-space-size=512"
+pm2 restart communiatec-server || pm2 start server.js --name "communiatec-server" --env NODE_ENV=production
+
+echo "   Waiting for server to stabilize..."
+sleep 3
+
 cd ..
 
 # 3. Update Client (only build if package.json or source files changed)

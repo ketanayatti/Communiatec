@@ -73,3 +73,28 @@ jobs:
             # 6. Run Update Script
             echo "Running update script..."
             bash scripts/update-app.sh
+
+            # 7. Verify server is running
+            echo -e "\n📋 Post-deployment verification..."
+            sleep 5
+            
+            # Check PM2 status
+            echo "PM2 Status:"
+            pm2 status
+            
+            # Check if server is responding on port 8000
+            echo "Testing server on port 8000..."
+            for i in {1..5}; do
+                if curl -s http://localhost:8000/api/maintenance/status &>/dev/null; then
+                    echo "✅ Server is responding!"
+                    break
+                fi
+                echo "  Attempt $i: Waiting for server to start..."
+                sleep 2
+            done
+            
+            # Show recent logs if server failed
+            if [ $? -ne 0 ]; then
+                echo "⚠️  Server may not be responding. Last 50 log lines:"
+                pm2 logs communiatec-server --lines 50 --nostream || echo "Cannot read logs"
+            fi
