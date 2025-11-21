@@ -33,9 +33,9 @@ echo "🎨 Updating Client..."
 cd Client
 npm install
 echo "🏗️ Building Client..."
-# Increase Node.js heap size for production build (default is ~512MB, use 1GB)
-export NODE_OPTIONS="--max-old-space-size=1024"
-npm run build
+# Increase Node.js heap size to 10GB for faster build process
+export NODE_OPTIONS="--max-old-space-size=10240"
+npm run build -- --minify=esbuild --logLevel=info
 unset NODE_OPTIONS
 
 echo "✅ Update Complete! Application should be live."
