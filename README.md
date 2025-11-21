@@ -2,34 +2,15 @@
 
   <!-- Header Animation/Logo Area -->
   <img src="https://capsule-render.vercel.app/api?type=waving&color=00BFFF&height=200&section=header&text=Communiatec&fontSize=80&animation=fadeIn&fontAlignY=35&desc=Secure%20Real-Time%20Collaboration%20Platform&descAlignY=55&descAlign=50" alt="Communiatec Header" width="100%"/>
-
-  <!-- Badges -->
-  <p>
-    <a href="https://github.com/ketanayatti/Communiatec/graphs/contributors">
-      <img src="https://img.shields.io/github/contributors/ketanayatti/Communiatec?style=for-the-badge&color=blue" alt="Contributors" />
-    </a>
-    <a href="https://github.com/ketanayatti/Communiatec/network/members">
-      <img src="https://img.shields.io/github/forks/ketanayatti/Communiatec?style=for-the-badge&color=orange" alt="Forks" />
-    </a>
-    <a href="https://github.com/ketanayatti/Communiatec/stargazers">
-      <img src="https://img.shields.io/github/stars/ketanayatti/Communiatec?style=for-the-badge&color=yellow" alt="Stars" />
-    </a>
-    <a href="https://github.com/ketanayatti/Communiatec/issues">
-      <img src="https://img.shields.io/github/issues/ketanayatti/Communiatec?style=for-the-badge&color=red" alt="Issues" />
-    </a>
-    <a href="https://github.com/ketanayatti/Communiatec/blob/master/LICENSE">
-      <img src="https://img.shields.io/github/license/ketanayatti/Communiatec?style=for-the-badge&color=green" alt="License" />
-    </a>
-  </p>
-
+  
   <h3>
-    <a href="#-demo">View Demo</a>
+    <a href="#-about-the-project">View Demo</a>
     <span> | </span>
     <a href="#-installation">Installation</a>
     <span> | </span>
-    <a href="#-features">Features</a>
+    <a href="#-key-features">Features</a>
     <span> | </span>
-    <a href="#-security">Security</a>
+    <a href="#-security-architecture">Security</a>
   </h3>
 
   <br />
@@ -37,7 +18,7 @@
 
 ---
 
-## 🚀 **About The Project**
+## 🚀 About The Project
 
 **Communiatec** is a next-generation collaboration platform engineered for security-conscious communities and institutes. It bridges the gap between seamless real-time interaction and enterprise-grade security.
 
@@ -45,7 +26,7 @@ Built on the **MERN Stack** and powered by **Socket.io**, it features a robust *
 
 ---
 
-## ⚡ **Key Features**
+## ⚡ Key Features
 
 <div align="center">
   <table>
@@ -94,22 +75,46 @@ Built on the **MERN Stack** and powered by **Socket.io**, it features a robust *
 
 ---
 
-## 🛠️ **Tech Stack**
+## 🛠️ Tech Stack
 
 <div align="center">
 
-| Frontend | Backend | Infrastructure | Security |
-| :---: | :---: | :---: | :---: |
-| ![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB) | ![NodeJS](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white) | ![AWS](https://img.shields.io/badge/AWS-232F3E?style=for-the-badge&logo=amazon-aws&logoColor=white) | ![JWT](https://img.shields.io/badge/JWT-black?style=for-the-badge&logo=JSON%20web%20tokens) |
-| ![Tailwind](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white) | ![Express](https://img.shields.io/badge/Express.js-404D59?style=for-the-badge) | ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white) | ![AES-256](https://img.shields.io/badge/AES_256-0052CC?style=for-the-badge) |
-| ![Vite](https://img.shields.io/badge/Vite-B73BFE?style=for-the-badge&logo=vite&logoColor=white) | ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white) | ![Nginx](https://img.shields.io/badge/Nginx-009639?style=for-the-badge&logo=nginx&logoColor=white) | ![OAuth](https://img.shields.io/badge/OAuth-2.0-white?style=for-the-badge) |
-| ![Socket.io](https://img.shields.io/badge/Socket.io-black?style=for-the-badge&logo=socket.io&badgeColor=010101) | ![Gemini](https://img.shields.io/badge/Gemini_AI-8E75B2?style=for-the-badge&logo=google-bard&logoColor=white) | | |
+|                                                      Frontend                                                       |                                                    Backend                                                    |                                            Infrastructure                                             |                                          Security                                           |
+| :-----------------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------: | :---------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------: |
+|         ![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)         |    ![NodeJS](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)    |  ![AWS](https://img.shields.io/badge/AWS-232F3E?style=for-the-badge&logo=amazon-aws&logoColor=white)  | ![JWT](https://img.shields.io/badge/JWT-black?style=for-the-badge&logo=JSON%20web%20tokens) |
+| ![Tailwind](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white) |                ![Express](https://img.shields.io/badge/Express.js-404D59?style=for-the-badge)                 | ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white) |         ![AES-256](https://img.shields.io/badge/AES_256-0052CC?style=for-the-badge)         |
+|           ![Vite](https://img.shields.io/badge/Vite-B73BFE?style=for-the-badge&logo=vite&logoColor=white)           |   ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)    |  ![Nginx](https://img.shields.io/badge/Nginx-009639?style=for-the-badge&logo=nginx&logoColor=white)   |         ![OAuth](https://img.shields.io/badge/OAuth-2.0-white?style=for-the-badge)          |
+|   ![Socket.io](https://img.shields.io/badge/Socket.io-black?style=for-the-badge&logo=socket.io&badgeColor=010101)   | ![Gemini](https://img.shields.io/badge/Gemini_AI-8E75B2?style=for-the-badge&logo=google-bard&logoColor=white) |                                                                                                       |                                                                                             |
 
 </div>
 
 ---
 
-## 🔒 **Security Architecture**
+## 📂 Project Structure
+
+```bash
+Communiatec/
+├── Client/                 # React Frontend
+│   ├── src/
+│   │   ├── components/     # Reusable UI components
+│   │   ├── pages/          # Application pages (Chat, Vault, etc.)
+│   │   ├── store/          # Redux state management
+│   │   └── lib/            # Utilities and API clients
+│   └── ...
+├── Server/                 # Node.js Backend
+│   ├── config/             # Database and Cloudinary config
+│   ├── controllers/        # Request handlers
+│   ├── middlewares/        # Security and Auth middleware
+│   ├── models/             # Mongoose schemas
+│   ├── routes/             # API endpoints
+│   ├── socket-handlers/    # Real-time logic
+│   └── ...
+└── README.md
+```
+
+---
+
+## 🔒 Security Architecture
 
 Communiatec employs a **Defense-in-Depth** strategy:
 
@@ -120,20 +125,23 @@ Communiatec employs a **Defense-in-Depth** strategy:
 
 ---
 
-## 💻 **Installation**
+## 💻 Installation
 
 ### Prerequisites
-*   Node.js (v18+)
-*   MongoDB
-*   Docker (Optional)
+
+- Node.js (v18+)
+- MongoDB
+- Docker (Optional)
 
 ### 1. Clone the Repository
+
 ```bash
 git clone https://github.com/ketanayatti/Communiatec.git
 cd Communiatec
 ```
 
 ### 2. Server Setup
+
 ```bash
 cd Server
 npm install
@@ -142,6 +150,7 @@ npm start
 ```
 
 ### 3. Client Setup
+
 ```bash
 cd Client
 npm install
@@ -151,7 +160,17 @@ npm run dev
 
 ---
 
-## 📸 **Screenshots**
+## 🗺️ Roadmap
+
+- [x] **Core Features** (Chat, Auth, Vault)
+- [x] **Security Hardening** (Encryption, RBAC)
+- [ ] **Mobile App** (React Native)
+- [ ] **Voice/Video Calls** (WebRTC)
+- [ ] **Plugin System** for community extensions
+
+---
+
+## 📸 Screenshots
 
 <div align="center">
   <!-- Replace these with actual screenshots when available -->
