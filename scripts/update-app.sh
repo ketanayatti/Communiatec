@@ -28,14 +28,28 @@ npm install
 pm2 restart communiatec-server || pm2 start server.js --name "communiatec-server"
 cd ..
 
-# 3. Update Client
+# 3. Update Client (only build if package.json or source files changed)
 echo "🎨 Updating Client..."
 cd Client
-npm install
-echo "🏗️ Building Client..."
-# Increase Node.js heap size to 10GB for faster build process
-export NODE_OPTIONS="--max-old-space-size=10240"
-npm run build -- --minify=esbuild --logLevel=info
-unset NODE_OPTIONS
+
+# Check if package.json changed
+if git diff HEAD~1 HEAD --name-only | grep -q "Client/package.json"; then
+    echo "package.json changed, installing dependencies..."
+    npm install
+else
+    echo "Skipping npm install (no package.json changes)"
+fi
+
+# Check if client source files changed
+if git diff HEAD~1 HEAD --name-only | grep -q "Client/src/\|Client/public/"; then
+    echo "🏗️ Client source files changed, rebuilding..."
+    export NODE_OPTIONS="--max-old-space-size=10240"
+    npm run build -- --minify=esbuild --logLevel=info
+    unset NODE_OPTIONS
+else
+    echo "✓ Skipping client build (no source changes detected)"
+fi
+
+cd ..
 
 echo "✅ Update Complete! Application should be live."
