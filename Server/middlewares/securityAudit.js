@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/UserModel');
+const logger = require('../utils/logger');
 
 /**
  * Security Audit Middleware and Utilities
@@ -13,20 +14,20 @@ const logSecurityEvent = (event, details, req = null) => {
   const userAgent = req?.get('User-Agent') || 'unknown';
   
   const logEntry = {
-    timestamp,
     event,
     ip,
     userAgent,
     ...details
   };
   
-  // In production, send this to a security monitoring service
-  console.log(`🔐 SECURITY EVENT:`, JSON.stringify(logEntry, null, 2));
-  
-  // For now, just log to console. In production, consider:
-  // - Sending to SIEM system
-  // - Alerting on critical events
-  // - Storing in secure audit log
+  // Log to winston logger
+  if (details.severity === 'HIGH' || details.severity === 'CRITICAL') {
+    logger.error(`SECURITY EVENT: ${event}`, logEntry);
+  } else if (details.severity === 'MEDIUM') {
+    logger.warn(`SECURITY EVENT: ${event}`, logEntry);
+  } else {
+    logger.info(`SECURITY EVENT: ${event}`, logEntry);
+  }
 };
 
 // Failed authentication logger

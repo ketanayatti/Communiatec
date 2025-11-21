@@ -2,22 +2,28 @@ const User = require("../models/UserModel");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const axios = require("axios");
+const { ROLES } = require("../config/iamConfig");
 const {
   logSuccessfulAuth,
   logFailedAuth,
   validatePasswordStrength,
 } = require("../middlewares/securityAudit");
+const { loginSchema, resetPasswordSchema } = require("../lib/validators/authValidators");
 
 
 const logIn = async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
+    // Validate input using Joi
+    const { error } = loginSchema.validate(req.body);
+    if (error) {
       return res.status(400).json({
         success: false,
-        message: "Please provide an email and password",
+        message: error.details[0].message,
       });
     }
+
+    const { email, password } = req.body;
+
 
     const data = await User.findOne({ email });
 
@@ -83,6 +89,7 @@ const logIn = async (req, res) => {
           _id: data._id,
           email: data.email,
           role: data.role,
+          permissions: ROLES[data.role] || [],
           profileSetup: data.profileSetup,
           passwordChanged: data.passwordChanged,
         },
@@ -96,6 +103,7 @@ const logIn = async (req, res) => {
         _id: data._id,
         email: data.email,
         role: data.role,
+        permissions: ROLES[data.role] || [],
         profileSetup: data.profileSetup,
         firstName: data.firstName,
         lastName: data.lastName,
@@ -132,6 +140,7 @@ const getUserInfo = async (req, res, next) => {
         _id: user._id,
         email: user.email,
         role: user.role,
+        permissions: ROLES[user.role] || [],
         profileSetup: user.profileSetup,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -350,16 +359,18 @@ const linkedinCallback = async (req, res) => {
 
 const resetPassword = async (req, res) => {
   try {
-    const { userId, newPassword } = req.body;
-
-    if (!userId || !newPassword) {
+    // Validate input using Joi
+    const { error } = resetPasswordSchema.validate(req.body);
+    if (error) {
       return res.status(400).json({
         success: false,
-        message: "User ID and new password are required",
+        message: error.details[0].message,
       });
     }
 
-    // Validate password strength
+    const { userId, newPassword } = req.body;
+
+    // Validate password strength (keep existing check as it might be more complex than Joi regex)
     const passwordValidation = validatePasswordStrength(newPassword);
     if (!passwordValidation.isValid) {
       return res.status(400).json({

@@ -1,6 +1,8 @@
 const jwt = require("jsonwebtoken");
 const Setting = require("../models/SettingModel");
 const User = require("../models/UserModel");
+const { hasPermission } = require("./iamMiddleware");
+const { PERMISSIONS } = require("../config/iamConfig");
 
 // Simple in-memory cache to avoid a DB read on every request.
 let cachedSettings = null;
@@ -69,16 +71,16 @@ module.exports = async function maintenanceMiddleware(req, res, next) {
         const decoded = jwt.verify(token, jwtSecret);
         userId = decoded.id; // Your JWT uses 'id' field
 
-        // Fetch user from database to verify admin role
+        // Fetch user from database to verify permissions
         const user = await User.findById(userId);
-        if (user && user.role === "admin") {
-          isAdmin = true;
+        if (user && hasPermission(user.role, PERMISSIONS.MAINTENANCE_BYPASS)) {
+          isAdmin = true; // Keeping variable name for minimal code change, but now means "has bypass permission"
           console.log(
-            `✅ Admin user ${user.email} accessing during maintenance`
+            `✅ User ${user.email} (Role: ${user.role}) accessing during maintenance`
           );
         } else if (user) {
           console.log(
-            `🚫 Non-admin user ${user.email} blocked during maintenance`
+            `🚫 User ${user.email} (Role: ${user.role}) blocked during maintenance`
           );
         }
       } catch (jwtError) {

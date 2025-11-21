@@ -32,7 +32,7 @@ async function writeAudit(
 // Admin Dashboard Stats
 exports.getDashboardStats = async (req, res) => {
   try {
-    // `requireRole(['admin'])` middleware should have populated req.requestingUser
+    // `requirePermission` middleware should have populated req.requestingUser
     const adminUser = req.requestingUser || req.user;
 
     // Get counts for dashboard
@@ -75,15 +75,7 @@ exports.getDashboardStats = async (req, res) => {
 exports.createUser = async (req, res) => {
   try {
     const adminUserCheck = req.requestingUser || req.user;
-    if (!adminUserCheck || adminUserCheck.role !== "admin") {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Access denied. Admin privileges required.",
-        });
-    }
-
+    
     // Validate input using Joi
     const { error, value } = createUserSchema.validate(req.body);
     if (error)
@@ -140,16 +132,6 @@ exports.createUser = async (req, res) => {
 // User Management
 exports.getAllUsers = async (req, res) => {
   try {
-    const adminUserCheck = req.requestingUser || req.user;
-    if (!adminUserCheck || adminUserCheck.role !== "admin") {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Access denied. Admin privileges required.",
-        });
-    }
-
     const { page = 1, limit = 10, search = "" } = req.query;
     const skip = (page - 1) * limit;
 
@@ -194,13 +176,6 @@ exports.getAllUsers = async (req, res) => {
 exports.updateUserRole = async (req, res) => {
   try {
     const adminUserCheck = req.requestingUser || req.user;
-    if (!adminUserCheck || adminUserCheck.role !== "admin")
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Access denied. Admin privileges required.",
-        });
 
     // Validate input
     const { error, value } = updateRoleSchema.validate(req.body);
@@ -267,13 +242,6 @@ exports.updateUserRole = async (req, res) => {
 exports.deleteUser = async (req, res) => {
   try {
     const adminUserCheck = req.requestingUser || req.user;
-    if (!adminUserCheck || adminUserCheck.role !== "admin")
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Access denied. Admin privileges required.",
-        });
 
     const { userId } = req.params;
 
@@ -333,15 +301,6 @@ exports.deleteUser = async (req, res) => {
 // Message Management
 exports.getRecentMessages = async (req, res) => {
   try {
-    const adminUserCheck = req.requestingUser || req.user;
-    if (!adminUserCheck || adminUserCheck.role !== "admin")
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Access denied. Admin privileges required.",
-        });
-
     const { page = 1, limit = 20 } = req.query;
     const skip = (page - 1) * limit;
 
@@ -376,14 +335,6 @@ exports.getRecentMessages = async (req, res) => {
 exports.deleteMessage = async (req, res) => {
   try {
     const adminUserCheck = req.requestingUser || req.user;
-    if (!adminUserCheck || adminUserCheck.role !== "admin") {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Access denied. Admin privileges required.",
-        });
-    }
 
     const { messageId } = req.params;
     const deletedMessage = await Message.findByIdAndDelete(messageId);

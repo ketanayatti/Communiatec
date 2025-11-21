@@ -653,7 +653,6 @@ const Users = () => {
                     icon: <Crown className="h-4 w-4" />,
                     desc: "Full control",
                   },
-                  // moderator role removed
                 ].map((r) => (
                   <Button
                     key={r.role}

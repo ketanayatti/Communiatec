@@ -131,7 +131,9 @@ const securityHeaders = (req, res, next) => {
     "font-src 'self' https://fonts.gstatic.com; " +
     "img-src 'self' data: https: blob:; " +
     "connect-src 'self' https: wss: ws:; " +
-    "frame-ancestors 'none';"
+    "frame-ancestors 'none'; " +
+    "object-src 'none'; " +
+    "base-uri 'self';"
   );
   
   // Additional security headers
@@ -139,6 +141,11 @@ const securityHeaders = (req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  
+  // HSTS (HTTP Strict Transport Security) - 1 year
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  }
   
   next();
 };

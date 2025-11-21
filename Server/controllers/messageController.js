@@ -1,15 +1,20 @@
 const Message = require('../models/MessageModel');
+const { getMessagesSchema, searchMessagesSchema } = require('../lib/validators/messageValidators');
+const logger = require('../utils/logger');
 
 const getMessages = async (req, res, next) => {
     try{
         const user1 = req.id;
-        const user2 = req.body.id;
-
-        if(!user1 || !user2){
+        
+        // Validate input
+        const { error } = getMessagesSchema.validate(req.body);
+        if (error) {
             return res.status(400).json({
-                Error: "Invalid request"
+                Error: error.details[0].message
             });
         }
+
+        const user2 = req.body.id;
 
         const chat = await Message.find({
             $or: [
@@ -25,7 +30,7 @@ const getMessages = async (req, res, next) => {
     }
 
     catch(err){
-        console.error("Error fetching messages:", err);
+        logger.error("Error fetching messages:", err);
         return res.status(500).json({
             Error: "Internal Server Error"
         });
@@ -34,14 +39,17 @@ const getMessages = async (req, res, next) => {
 
 const searchMessages = async (req, res) => {
     try {
-        const { chatId, query } = req.body;
         const userId = req.id;
 
-        if (!chatId || !query) {
+        // Validate input
+        const { error } = searchMessagesSchema.validate(req.body);
+        if (error) {
             return res.status(400).json({
-                error: "Missing required parameters"
+                error: error.details[0].message
             });
         }
+
+        const { chatId, query } = req.body;
 
         const messages = await Message.find({
             $and: [
@@ -65,7 +73,7 @@ const searchMessages = async (req, res) => {
 
         return res.status(200).json({ messages });
     } catch (error) {
-        console.error('Error searching messages:', error);
+        logger.error('Error searching messages:', error);
         return res.status(500).json({
             error: "Internal Server Error"
         });

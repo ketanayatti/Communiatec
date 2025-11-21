@@ -270,13 +270,14 @@ app.get("/api/health", (req, res) => {
 
 // Rest of your server setup remains the same...
 // ✨ ENHANCED: Error handling middleware
+const logger = require("./utils/logger");
+
 app.use((err, req, res, next) => {
-  console.error("🚨 Server Error:", {
+  logger.error("🚨 Server Error:", {
     error: err.message,
     stack: err.stack,
     url: req.url,
     method: req.method,
-    timestamp: new Date().toISOString(),
     ip: req.ip,
   });
 

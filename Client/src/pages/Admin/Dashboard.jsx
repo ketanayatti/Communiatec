@@ -410,8 +410,6 @@ const Dashboard = () => {
                               className={`px-4 py-2 rounded-xl font-bold border shadow-lg ${
                                 user.role === "admin"
                                   ? "bg-orange-500/20 text-orange-300 hover:bg-orange-500/30 border-orange-500/30 shadow-orange-500/20"
-                                  : user.role === "moderator"
-                                  ? "bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 border-purple-500/30 shadow-purple-500/20"
                                   : "bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 border-cyan-500/30 shadow-cyan-500/20"
                               }`}
                             >

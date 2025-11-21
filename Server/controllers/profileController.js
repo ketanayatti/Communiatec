@@ -2,15 +2,20 @@ const User = require("../models/UserModel");
 const { renameSync, unlinkSync } = require("fs");
 const path = require("path");
 const cloudinary = require("../config/cloudinary");
+const { updateProfileSchema } = require("../lib/validators/profileValidators");
+const logger = require("../utils/logger");
 
 const updateProfile = async (req, res) => {
   try {
     const { id } = req;
-    const { firstName, lastName } = req.body;
-
-    if (!firstName || !lastName) {
-      return res.status(400).json({ error: "Please fill in all fields" });
+    
+    // Validate input using Joi
+    const { error } = updateProfileSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ error: error.details[0].message });
     }
+
+    const { firstName, lastName } = req.body;
 
     const userData = await User.findByIdAndUpdate(
       id,
@@ -22,6 +27,8 @@ const updateProfile = async (req, res) => {
       { new: true, runValidators: true }
     );
 
+    logger.info(`Profile updated for user: ${userData.email}`);
+
     return res.status(200).json({
       id: userData._id,
       email: userData.email,
@@ -31,7 +38,7 @@ const updateProfile = async (req, res) => {
       image: userData.image,
     });
   } catch (err) {
-    // console.log(err);
+    logger.error("Error updating profile:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -70,12 +77,12 @@ const uploadImage = async (req, res) => {
 
     user.image = cloudinaryResponse.secure_url;
     await user.save();
-    console.log("Cloudinary link: ", cloudinaryResponse.secure_url);
+    logger.info(`Profile image uploaded for user: ${user.email}`);
     return res.status(200).json({
       image: user.image,
     });
   } catch (err) {
-    // console.log(err);
+    logger.error("Error uploading image:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -85,7 +92,7 @@ const deleteImage = async (req, res) => {
     const userId = req.id;
     const user = await User.findById(userId);
     if (!user.image) {
-      console.log("No image found");
+      logger.warn(`Delete image attempt failed: No image found for user ${userId}`);
       return res.status(400).json({ error: "No image found" });
     }
 
@@ -94,9 +101,10 @@ const deleteImage = async (req, res) => {
     user.image = null;
     await user.save();
 
+    logger.info(`Profile image deleted for user: ${user.email}`);
     return res.status(200).send("Profile image deleted");
   } catch (err) {
-    // console.log(err);
+    logger.error("Error deleting image:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 };

@@ -35,7 +35,7 @@ const CodeEditor = () => {
     emitCode,
     codeConnectionState,
   } = useSocket();
-  const currentUserId = userInfo?.id || userInfo?._id;
+  const currentUserId = (userInfo?.id || userInfo?._id)?.toString();
 
   // Socket and connection states
   const [codeSocket, setCodeSocket] = useState(null);

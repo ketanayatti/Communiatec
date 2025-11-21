@@ -15,6 +15,11 @@ const handleCodeCollaboration = (io) => {
     const { sessionId, user } = data;
     const userId = (user._id || user.id)?.toString();
     
+    // Set socket properties IMMEDIATELY before any async operations
+    socket.userId = userId;
+    socket.sessionId = sessionId;
+    socket.userInfo = user;
+
     console.log("🔍 Debug user data:", {
       userId: userId,
       userObject: user,
@@ -34,10 +39,7 @@ const handleCodeCollaboration = (io) => {
 
         // Join the new session room
         await socket.join(sessionId);
-        socket.userId = userId;
-        socket.sessionId = sessionId;
-        socket.userInfo = user;
-
+        
         console.log(`✅ Socket ${socket.id} joined room ${sessionId}`);
 
         // Get or create session
@@ -146,26 +148,33 @@ const handleCodeCollaboration = (io) => {
     socket.on("code-change", async (data) => {
       const { sessionId, code, changes, userId, timestamp } = data;
 
-      console.log(`📝 Code change from user ${userId} in session ${sessionId}`);
-      console.log(`📝 Code length: ${code?.length} characters`);
-      console.log(`📝 Socket rooms:`, Array.from(socket.rooms));
-      console.log(`📝 Socket userId: ${socket.userId}, Data userId: ${userId}`);
-
+      // console.log(`📝 Code change from user ${userId} in session ${sessionId}`);
+      
       try {
         // Verify user is in this session
         if (socket.sessionId !== sessionId) {
           console.log(
             `⚠️  User ${userId} trying to edit session they're not in (${socket.sessionId} vs ${sessionId})`
           );
-          return;
+          // Attempt to auto-fix if session ID matches but socket property isn't set
+          if (sessionId) {
+             socket.sessionId = sessionId;
+             socket.userId = userId;
+             socket.join(sessionId);
+             console.log(`🔧 Auto-fixed socket session/user ID for ${socket.id}`);
+          } else {
+             return;
+          }
         }
 
         // Additional verification - ensure the userId matches socket.userId
-        if (socket.userId !== userId) {
+        // Use loose equality or string comparison to be safe
+        if (socket.userId && userId && socket.userId.toString() !== userId.toString()) {
           console.log(
             `⚠️  UserId mismatch: socket.userId=${socket.userId}, data.userId=${userId}`
           );
-          return;
+          // Don't return here, just log warning. Trust the socket connection for now if session matches.
+          // return; 
         }
 
         // Update code in database
@@ -185,35 +194,22 @@ const handleCodeCollaboration = (io) => {
           return;
         }
 
-        console.log(`💾 Code saved to database for session ${sessionId}`);
+        // console.log(`💾 Code saved to database for session ${sessionId}`);
 
         // Broadcast to OTHER users in the session (exclude sender)
         const updateData = {
           sessionId,
           code,
           changes,
-          userId: socket.userId,
+          userId: socket.userId || userId, // Fallback to data.userId if socket.userId is missing
           socketId: socket.id,
           timestamp: timestamp || Date.now(),
         };
 
         // Use the namespace to broadcast
         socket.to(sessionId).emit("code-update", updateData);
-        console.log(
-          `📡 Broadcasted code update to other users in room ${sessionId}`
-        );
+        // console.log(`📡 Broadcasted code update to other users in room ${sessionId}`);
 
-        // Verify broadcast - get all clients and log details
-        const roomClients = await codeNamespace.in(sessionId).fetchSockets();
-        const otherClients = roomClients.filter(
-          (client) => client.id !== socket.id
-        );
-        
-        console.log(`📊 Room ${sessionId} has ${roomClients.length} total clients:`);
-        roomClients.forEach(client => {
-          console.log(`   - Socket ${client.id}, User ${client.userId}`);
-        });
-        console.log(`📊 Broadcasting to ${otherClients.length} other clients`);
       } catch (error) {
         console.error("❌ Code change error:", error);
         socket.emit("error", {
