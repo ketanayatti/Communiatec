@@ -28,12 +28,30 @@ jobs:
                 sudo npm install -g pm2
             fi
 
-            # 2. Clone Repo if missing
-            if [ ! -d "$HOME/Communiatec" ]; then
+            # 2. Clone/Update Repo
+            APP_DIR="$HOME/Communiatec"
+            if [ ! -d "$APP_DIR" ]; then
                 echo "Cloning repository..."
-                git clone https://github.com/ketanayatti/Communiatec.git $HOME/Communiatec
+                git clone https://github.com/ketanayatti/Communiatec.git $APP_DIR
+            else
+                echo "Repository already exists, pulling latest changes..."
+                cd $APP_DIR
+                git fetch origin
             fi
 
-            # 3. Run Update Script
-            chmod +x $HOME/Communiatec/scripts/update-app.sh
-            $HOME/Communiatec/scripts/update-app.sh
+            # 3. Verify scripts directory exists
+            if [ ! -d "$APP_DIR/scripts" ]; then
+                echo "ERROR: scripts directory not found in $APP_DIR"
+                exit 1
+            fi
+
+            # 4. Verify update script exists
+            if [ ! -f "$APP_DIR/scripts/update-app.sh" ]; then
+                echo "ERROR: update-app.sh not found at $APP_DIR/scripts/update-app.sh"
+                ls -la "$APP_DIR/scripts/" || echo "scripts directory listing failed"
+                exit 1
+            fi
+
+            # 5. Run Update Script
+            echo "Running update script..."
+            bash "$APP_DIR/scripts/update-app.sh"
