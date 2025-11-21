@@ -16,7 +16,7 @@ export default defineConfig({
       ],
       workbox: {
         // Raise precache limit to stop the build error
-        maximumFileSizeToCacheInBytes: 6_000_000, // ~6 MB [web:3]
+        maximumFileSizeToCacheInBytes: 8_000_000, // ~8 MB
         cleanupOutdatedCaches: true,
         skipWaiting: true,
         clientsClaim: true,

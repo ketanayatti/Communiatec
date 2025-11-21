@@ -43,6 +43,15 @@ pids
 .DS_Store
 Thumbs.db
 
+# Security
+*.pem
+*.key
+*.cert
+
+# User Uploads
+Server/uploads/*
+!Server/uploads/.gitkeep
+
 # Optional: Ignore specific build outputs if they differ
 Client/dist/
 Client/build/
