@@ -36,22 +36,38 @@ jobs:
             else
                 echo "Repository already exists, pulling latest changes..."
                 cd $APP_DIR
-                git fetch origin
+                git reset --hard HEAD
+                git fetch origin master
+                git reset --hard origin/master
             fi
 
-            # 3. Verify scripts directory exists
-            if [ ! -d "$APP_DIR/scripts" ]; then
-                echo "ERROR: scripts directory not found in $APP_DIR"
-                exit 1
-            fi
+            # 3. Verify scripts directory exists (with retry)
+            cd "$APP_DIR"
+            for attempt in 1 2 3; do
+                if [ -d "scripts" ]; then
+                    echo "scripts directory found on attempt $attempt"
+                    break
+                fi
+                echo "Attempt $attempt: scripts directory not found, checking git status..."
+                git status
+                git ls-files scripts/
+                sleep 1
+            done
 
             # 4. Verify update script exists
-            if [ ! -f "$APP_DIR/scripts/update-app.sh" ]; then
-                echo "ERROR: update-app.sh not found at $APP_DIR/scripts/update-app.sh"
-                ls -la "$APP_DIR/scripts/" || echo "scripts directory listing failed"
+            if [ ! -f "scripts/update-app.sh" ]; then
+                echo "ERROR: update-app.sh not found"
+                echo "Current directory: $(pwd)"
+                echo "Directory contents:"
+                ls -la
+                echo "Scripts directory contents:"
+                ls -la scripts/ 2>&1 || echo "Cannot list scripts directory"
                 exit 1
             fi
 
-            # 5. Run Update Script
+            # 5. Make scripts executable
+            chmod +x scripts/update-app.sh scripts/setup-ec2.sh 2>/dev/null || true
+
+            # 6. Run Update Script
             echo "Running update script..."
-            bash "$APP_DIR/scripts/update-app.sh"
+            bash scripts/update-app.sh
