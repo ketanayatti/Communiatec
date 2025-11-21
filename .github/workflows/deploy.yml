@@ -18,6 +18,8 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          timeout: 3600s
+          command_timeout: 3600s
           script: |
             # 1. Install Dependencies if Node is missing (First time setup)
             if ! command -v node &> /dev/null; then
