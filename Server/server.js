@@ -1,4 +1,5 @@
 const express = require("express");
+const axios = require("axios");
 const dbConnect = require("./config/database");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
@@ -486,8 +487,9 @@ const startServer = async () => {
       const keepAliveInterval = setInterval(() => {
         const serverUrl = process.env.SERVER_URL || `http://localhost:${PORT}`;
 
-        // Use fetch or http to ping our own server
-        fetch(`${serverUrl}/api/keepalive`)
+        // Use axios to ping our own server
+        axios
+          .get(`${serverUrl}/api/keepalive`)
           .then(() => {
             console.log("✅ Keepalive ping successful");
           })
