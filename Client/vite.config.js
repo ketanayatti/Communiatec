@@ -52,7 +52,7 @@ export default defineConfig({
     // Never show the large chunk warning again
     chunkSizeWarningLimit: 1600,
     sourcemap: false, // Disable sourcemaps for production to save memory/time
-    target: 'es2015', // Modern browsers
+    target: "es2015", // Modern browsers
     commonjsOptions: {
       include: [/node_modules/],
     },
@@ -66,7 +66,11 @@ export default defineConfig({
               return "vendor_monaco";
             }
             // 2. 3D / Visualization
-            if (id.includes("three") || id.includes("@react-three") || id.includes("vanta")) {
+            if (
+              id.includes("three") ||
+              id.includes("@react-three") ||
+              id.includes("vanta")
+            ) {
               return "vendor_three";
             }
             // 3. React Ecosystem (Core)
@@ -101,7 +105,7 @@ export default defineConfig({
             ) {
               return "vendor_utils";
             }
-            
+
             // Default vendor chunk for everything else
             return "vendor_libs";
           }

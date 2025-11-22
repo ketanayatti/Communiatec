@@ -20,6 +20,16 @@ cd "$APP_DIR"
 echo "📥 Pulling latest changes from Git..."
 git pull origin master
 
+# Get the last deployed commit hash
+LAST_DEPLOY_FILE=".last-deploy-commit"
+if [ -f "$LAST_DEPLOY_FILE" ]; then
+    LAST_COMMIT=$(cat "$LAST_DEPLOY_FILE")
+    echo "🔍 Checking changes since $LAST_COMMIT..."
+else
+    echo "⚠️  No previous deployment record found. Assuming full update."
+    LAST_COMMIT="HEAD~1"
+fi
+
 # 2. Update Server
 echo "🛠️ Updating Server..."
 cd Server
@@ -43,7 +53,14 @@ else
     echo "PORT=4000" >> .env
 fi
 
-npm install
+# Check if Server package.json changed
+if git diff "$LAST_COMMIT" HEAD --name-only | grep -q "Server/package.json"; then
+    echo "📦 Server package.json changed, installing dependencies..."
+    npm install --production --no-audit --prefer-offline
+else
+    echo "✓ Skipping Server npm install (no package.json changes)"
+fi
+
 # Restart PM2 process with environment variables
 export NODE_ENV=production
 export NODE_OPTIONS="--max-old-space-size=1024"
@@ -59,16 +76,16 @@ cd ..
 echo "🎨 Updating Client..."
 cd Client
 
-# Check if package.json changed
-if git diff HEAD~1 HEAD --name-only | grep -q "Client/package.json"; then
-    echo "package.json changed, installing dependencies..."
-    npm install
+# Check if Client package.json changed
+if git diff "$LAST_COMMIT" HEAD --name-only | grep -q "Client/package.json"; then
+    echo "📦 Client package.json changed, installing dependencies..."
+    npm install --no-audit --prefer-offline
 else
-    echo "Skipping npm install (no package.json changes)"
+    echo "✓ Skipping Client npm install (no package.json changes)"
 fi
 
 # Check if client source files changed
-if git diff HEAD~1 HEAD --name-only | grep -q "Client/src/\|Client/public/"; then
+if git diff "$LAST_COMMIT" HEAD --name-only | grep -q "Client/src/\|Client/public/\|Client/vite.config.js\|Client/index.html"; then
     echo "🏗️ Client source files changed, rebuilding..."
     export NODE_OPTIONS="--max-old-space-size=7168"
     npm run build -- --minify=esbuild --logLevel=info
@@ -78,5 +95,8 @@ else
 fi
 
 cd ..
+
+# Save the current commit hash for next time
+git rev-parse HEAD > "$LAST_DEPLOY_FILE"
 
 echo "✅ Update Complete! Application should be live."
