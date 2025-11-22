@@ -34,12 +34,12 @@ fi
 # 5. Start/Restart the server
 echo "2️⃣ Starting server with PM2..."
 export NODE_ENV=production
-export NODE_OPTIONS="--max-old-space-size=512"
+export NODE_OPTIONS="--max-old-space-size=1024"
 
 # First, try to restart
 pm2 restart communiatec-server 2>/dev/null || {
     echo "3️⃣ Server not running, starting fresh..."
-    pm2 start server.js --name "communiatec-server" --env NODE_ENV=production --env NODE_OPTIONS="--max-old-space-size=512"
+    pm2 start server.js --name "communiatec-server" --env NODE_ENV=production --env NODE_OPTIONS="--max-old-space-size=1024"
 }
 
 # 6. Save PM2 config

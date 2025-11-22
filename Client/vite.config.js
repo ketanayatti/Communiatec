@@ -50,24 +50,60 @@ export default defineConfig({
   },
   build: {
     // Never show the large chunk warning again
-    chunkSizeWarningLimit: 10000, // 10 MB [web:42][web:21]
+    chunkSizeWarningLimit: 1600,
+    sourcemap: false, // Disable sourcemaps for production to save memory/time
+    target: 'es2015', // Modern browsers
     commonjsOptions: {
       include: [/node_modules/],
     },
     rollupOptions: {
       output: {
-        // Eager splitting by top-level package (no dynamic imports)
+        // Optimized chunk splitting
         manualChunks(id) {
           if (id.includes("node_modules")) {
-            if (id.includes("monaco-editor")) return "vendor_monaco";
-            if (id.includes("@mui") || id.includes("@material-ui"))
-              return "vendor_mui";
-            if (id.includes("react-router")) return "vendor_react_router";
-            if (id.includes("chart.js") || id.includes("@tanstack"))
-              return "vendor_charts";
-            if (id.includes("@radix-ui")) return "vendor_radix";
-            const pkg = id.split("node_modules/")[1];
-            return pkg ? pkg.split("/")[0] : "vendor";
+            // 1. Monaco Editor (Huge)
+            if (id.includes("monaco-editor") || id.includes("@monaco-editor")) {
+              return "vendor_monaco";
+            }
+            // 2. 3D / Visualization
+            if (id.includes("three") || id.includes("@react-three") || id.includes("vanta")) {
+              return "vendor_three";
+            }
+            // 3. React Ecosystem (Core)
+            if (
+              id.includes("react") ||
+              id.includes("react-dom") ||
+              id.includes("react-router") ||
+              id.includes("zustand") ||
+              id.includes("prop-types")
+            ) {
+              return "vendor_react";
+            }
+            // 4. UI Components & Icons
+            if (
+              id.includes("@radix-ui") ||
+              id.includes("lucide-react") ||
+              id.includes("react-icons") ||
+              id.includes("@heroicons") ||
+              id.includes("framer-motion") ||
+              id.includes("clsx") ||
+              id.includes("tailwind-merge")
+            ) {
+              return "vendor_ui";
+            }
+            // 5. Utilities
+            if (
+              id.includes("axios") ||
+              id.includes("date-fns") ||
+              id.includes("moment") ||
+              id.includes("socket.io-client") ||
+              id.includes("uuid")
+            ) {
+              return "vendor_utils";
+            }
+            
+            // Default vendor chunk for everything else
+            return "vendor_libs";
           }
         },
       },
