@@ -88,17 +88,20 @@ jobs:
 
           echo "📊 Artifact Size:"
           du -sh deploy_artifact/
+          
+          # Compress Artifacts (Huge Speedup for SCP)
+          echo "📦 Compressing artifacts..."
+          tar -czf deploy_artifact.tar.gz -C deploy_artifact .
 
-      # 4. Transfer Files to EC2 (SCP - Reliable & Fast with Optimized Artifacts)
+      # 4. Transfer Files to EC2 (SCP - Compressed)
       - name: Copy files to EC2
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "deploy_artifact/*"
-          target: "/home/ubuntu/Communiatec_Temp"
-          strip_components: 1
+          source: "deploy_artifact.tar.gz"
+          target: "/home/ubuntu/"
 
       # 5. Finalize Deployment
       - name: Deploy on EC2
@@ -110,8 +113,18 @@ jobs:
           script: |
             APP_DIR="/home/ubuntu/Communiatec"
             TEMP_DIR="/home/ubuntu/Communiatec_Temp"
+            ARCHIVE="/home/ubuntu/deploy_artifact.tar.gz"
 
             echo "🚀 Starting Deployment..."
+            
+            # Prepare Temp Directory
+            rm -rf $TEMP_DIR
+            mkdir -p $TEMP_DIR
+            
+            # Extract Artifacts
+            echo "📦 Extracting artifacts..."
+            tar -xzf $ARCHIVE -C $TEMP_DIR
+            rm $ARCHIVE
 
             # Ensure Directories
             mkdir -p $APP_DIR/Client
