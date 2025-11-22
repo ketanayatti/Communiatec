@@ -82,10 +82,10 @@ jobs:
             echo "PM2 Status:"
             pm2 status
 
-            # Check if server is responding on port 8000
-            echo "Testing server on port 8000..."
+            # Check if server is responding on port 4000
+            echo "Testing server on port 4000..."
             for i in {1..5}; do
-                if curl -s http://localhost:8000/api/maintenance/status &>/dev/null; then
+                if curl -s http://localhost:4000/api/maintenance/status &>/dev/null; then
                     echo "✅ Server is responding!"
                     break
                 fi

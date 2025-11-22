@@ -46,7 +46,7 @@ fi
 npm install
 # Restart PM2 process with environment variables
 export NODE_ENV=production
-export NODE_OPTIONS="--max-old-space-size=512"
+export NODE_OPTIONS="--max-old-space-size=1024"
 # Use --update-env to ensure new PORT/env vars are picked up
 pm2 restart communiatec-server --update-env || pm2 start server.js --name "communiatec-server" --env NODE_ENV=production
 
@@ -70,7 +70,7 @@ fi
 # Check if client source files changed
 if git diff HEAD~1 HEAD --name-only | grep -q "Client/src/\|Client/public/"; then
     echo "🏗️ Client source files changed, rebuilding..."
-    export NODE_OPTIONS="--max-old-space-size=10240"
+    export NODE_OPTIONS="--max-old-space-size=4096"
     npm run build -- --minify=esbuild --logLevel=info
     unset NODE_OPTIONS
 else
