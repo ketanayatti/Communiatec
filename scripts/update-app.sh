@@ -70,7 +70,7 @@ fi
 # Check if client source files changed
 if git diff HEAD~1 HEAD --name-only | grep -q "Client/src/\|Client/public/"; then
     echo "🏗️ Client source files changed, rebuilding..."
-    export NODE_OPTIONS="--max-old-space-size=4096"
+    export NODE_OPTIONS="--max-old-space-size=7168"
     npm run build -- --minify=esbuild --logLevel=info
     unset NODE_OPTIONS
 else
