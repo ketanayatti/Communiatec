@@ -86,12 +86,12 @@ fi
 
 # Check if client source files changed
 if git diff "$LAST_COMMIT" HEAD --name-only | grep -q "Client/src/\|Client/public/\|Client/vite.config.js\|Client/index.html"; then
-    echo "🏗️ Client source files changed, rebuilding..."
-    export NODE_OPTIONS="--max-old-space-size=7168"
-    npm run build -- --minify=esbuild --logLevel=info
-    unset NODE_OPTIONS
+    echo "⚠️  Client source files changed."
+    echo "🛑 SKIPPING BUILD on Server to prevent crash."
+    echo "👉 Please push to GitHub to trigger the safe Cloud Build."
+    echo "   (This script only updates the Backend code)"
 else
-    echo "✓ Skipping client build (no source changes detected)"
+    echo "✓ No client source changes detected."
 fi
 
 cd ..

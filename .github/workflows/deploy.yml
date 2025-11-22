@@ -88,7 +88,7 @@ jobs:
 
           echo "📊 Artifact Size:"
           du -sh deploy_artifact/
-          
+
           # Compress Artifacts (Huge Speedup for SCP)
           echo "📦 Compressing artifacts..."
           tar -czf deploy_artifact.tar.gz -C deploy_artifact .
@@ -116,11 +116,11 @@ jobs:
             ARCHIVE="/home/ubuntu/deploy_artifact.tar.gz"
 
             echo "🚀 Starting Deployment..."
-            
+
             # Prepare Temp Directory
             rm -rf $TEMP_DIR
             mkdir -p $TEMP_DIR
-            
+
             # Extract Artifacts
             echo "📦 Extracting artifacts..."
             tar -xzf $ARCHIVE -C $TEMP_DIR
