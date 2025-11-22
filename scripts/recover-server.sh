@@ -59,6 +59,6 @@ pm2 status
 
 # 10. Test connection
 echo -e "\n7️⃣ Testing server connection..."
-curl -s http://localhost:8000/api/maintenance/status && echo "✅ Server is responding!" || echo "⚠️  Server not responding yet, may take a moment to fully start"
+curl -s http://localhost:4000/api/maintenance/status && echo "✅ Server is responding!" || echo "⚠️  Server not responding yet, may take a moment to fully start"
 
 echo -e "\n✅ Recovery complete"

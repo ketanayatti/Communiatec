@@ -15,8 +15,8 @@ echo -e "\n2️⃣ Checking communiatec-server process..."
 pm2 info communiatec-server || echo "❌ Server not in PM2"
 
 # Check if server is listening
-echo -e "\n3️⃣ Checking if server is listening on port 8000..."
-netstat -tulpn 2>/dev/null | grep -i listen | grep -i "8000\|:8000" || echo "❌ Port 8000 not found"
+echo -e "\n3️⃣ Checking if server is listening on port 4000..."
+netstat -tulpn 2>/dev/null | grep -i listen | grep -i "4000\|:4000" || echo "❌ Port 4000 not found"
 
 # Check server logs
 echo -e "\n4️⃣ Last 20 lines of server logs..."
@@ -28,7 +28,7 @@ sudo systemctl status nginx --no-pager || echo "❌ Nginx not running"
 
 # Test local connection
 echo -e "\n6️⃣ Testing local server connection..."
-curl -s http://localhost:8000/api/maintenance/status || echo "❌ Cannot connect to local server"
+curl -s http://localhost:4000/api/maintenance/status || echo "❌ Cannot connect to local server"
 
 # Check environment variables
 echo -e "\n7️⃣ Checking server environment..."

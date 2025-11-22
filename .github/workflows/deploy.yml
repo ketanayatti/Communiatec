@@ -77,11 +77,11 @@ jobs:
             # 7. Verify server is running
             echo -e "\n📋 Post-deployment verification..."
             sleep 5
-            
+
             # Check PM2 status
             echo "PM2 Status:"
             pm2 status
-            
+
             # Check if server is responding on port 8000
             echo "Testing server on port 8000..."
             for i in {1..5}; do
@@ -92,7 +92,7 @@ jobs:
                 echo "  Attempt $i: Waiting for server to start..."
                 sleep 2
             done
-            
+
             # Show recent logs if server failed
             if [ $? -ne 0 ]; then
                 echo "⚠️  Server may not be responding. Last 50 log lines:"

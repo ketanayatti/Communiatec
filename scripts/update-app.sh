@@ -28,7 +28,7 @@ cd Server
 if [ ! -f ".env" ]; then
     echo "⚠️  .env file missing in Server, creating with defaults..."
     cat > .env << 'ENVEOF'
-PORT=8000
+PORT=4000
 NODE_ENV=production
 REDIS_URL=disabled
 ALLOW_VERCEL_PREVIEWS=true
@@ -36,9 +36,9 @@ ENVEOF
     echo "   ⚠️  IMPORTANT: Update .env with your database and service credentials!"
 fi
 
-# Ensure PORT is set to 8000 for production
+# Ensure PORT is set to 4000 for production
 if ! grep -q "^PORT=" .env; then
-    echo "PORT=8000" >> .env
+    echo "PORT=4000" >> .env
 fi
 
 npm install
