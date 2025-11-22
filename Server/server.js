@@ -444,7 +444,7 @@ const PORT = process.env.PORT || 4000;
 const startServer = async () => {
   try {
     await dbConnect();
-    
+
     server.listen(PORT, () => {
       console.log("🚀 Communiatec Server Started!");
       console.log("=".repeat(50));
@@ -463,7 +463,8 @@ const startServer = async () => {
 
         // Self-ping every 10 minutes to prevent sleep (Render sleeps after 15 minutes)
         const keepAliveInterval = setInterval(() => {
-          const serverUrl = process.env.SERVER_URL || `http://localhost:${PORT}`;
+          const serverUrl =
+            process.env.SERVER_URL || `http://localhost:${PORT}`;
 
           // Use fetch or http to ping our own server
           fetch(`${serverUrl}/api/keepalive`)
