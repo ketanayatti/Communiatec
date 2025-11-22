@@ -1,6 +1,12 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Settings, Clock, Shield, RefreshCw, MessageCircle } from "lucide-react";
+import {
+  Settings,
+  Clock,
+  Shield,
+  RefreshCw,
+  MessageCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const MaintenanceScreen = () => {
@@ -24,9 +30,9 @@ const MaintenanceScreen = () => {
       opacity: 1,
       transition: {
         duration: 0.6,
-        staggerChildren: 0.2
-      }
-    }
+        staggerChildren: 0.2,
+      },
+    },
   };
 
   const itemVariants = {
@@ -34,8 +40,8 @@ const MaintenanceScreen = () => {
     visible: {
       y: 0,
       opacity: 1,
-      transition: { duration: 0.5 }
-    }
+      transition: { duration: 0.5 },
+    },
   };
 
   const pulseVariants = {
@@ -44,9 +50,9 @@ const MaintenanceScreen = () => {
       transition: {
         duration: 2,
         repeat: Infinity,
-        ease: "easeInOut"
-      }
-    }
+        ease: "easeInOut",
+      },
+    },
   };
 
   return (
@@ -82,7 +88,7 @@ const MaintenanceScreen = () => {
       >
         {/* Logo and Brand */}
         <motion.div variants={itemVariants} className="mb-8">
-          <motion.div 
+          <motion.div
             className="inline-flex items-center gap-4 mb-6"
             variants={pulseVariants}
             animate="pulse"
@@ -100,11 +106,13 @@ const MaintenanceScreen = () => {
             </div>
             <div className="text-left">
               <h1 className="text-4xl font-black bg-gradient-to-r from-white via-cyan-200 to-blue-200 bg-clip-text text-transparent">
-                TeckTalke
+                Communiatec
               </h1>
               <div className="flex items-center gap-2 mt-1">
                 <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
-                <span className="text-sm text-cyan-300 font-mono">Maintenance Mode</span>
+                <span className="text-sm text-cyan-300 font-mono">
+                  Maintenance Mode
+                </span>
               </div>
             </div>
           </motion.div>
@@ -116,12 +124,12 @@ const MaintenanceScreen = () => {
             className="w-24 h-24 bg-gradient-to-br from-orange-500/20 to-yellow-500/20 rounded-full flex items-center justify-center mx-auto mb-6 backdrop-blur-sm border border-orange-500/30"
             animate={{
               scale: [1, 1.1, 1],
-              rotate: [0, 5, -5, 0]
+              rotate: [0, 5, -5, 0],
             }}
             transition={{
               duration: 4,
               repeat: Infinity,
-              ease: "easeInOut"
+              ease: "easeInOut",
             }}
           >
             <Settings className="w-12 h-12 text-orange-400" />
@@ -134,13 +142,16 @@ const MaintenanceScreen = () => {
             We're Making Things Better
           </h2>
           <p className="text-xl text-gray-300 mb-6 leading-relaxed">
-            TeckTalke is currently undergoing scheduled maintenance to improve your experience.
-            We'll be back online shortly.
+            Communiatec is currently undergoing scheduled maintenance to improve
+            your experience. We'll be back online shortly.
           </p>
         </motion.div>
 
         {/* Status cards */}
-        <motion.div variants={itemVariants} className="grid md:grid-cols-2 gap-4 mb-8">
+        <motion.div
+          variants={itemVariants}
+          className="grid md:grid-cols-2 gap-4 mb-8"
+        >
           <div className="p-6 bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10">
             <div className="flex items-center gap-3 mb-3">
               <Clock className="w-6 h-6 text-cyan-400" />
@@ -148,7 +159,7 @@ const MaintenanceScreen = () => {
             </div>
             <p className="text-gray-300">Usually 15-30 minutes</p>
           </div>
-          
+
           <div className="p-6 bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10">
             <div className="flex items-center gap-3 mb-3">
               <Shield className="w-6 h-6 text-green-400" />
@@ -178,16 +189,20 @@ const MaintenanceScreen = () => {
             <RefreshCw className="w-5 h-5 mr-2" />
             Check Again
           </Button>
-          
+
           <p className="text-sm text-gray-400">
             Follow us on social media for real-time updates
           </p>
         </motion.div>
 
         {/* Footer message */}
-        <motion.div variants={itemVariants} className="mt-12 pt-8 border-t border-white/10">
+        <motion.div
+          variants={itemVariants}
+          className="mt-12 pt-8 border-t border-white/10"
+        >
           <p className="text-gray-400 text-sm">
-            Thank you for your patience. We're working hard to get back online as quickly as possible.
+            Thank you for your patience. We're working hard to get back online
+            as quickly as possible.
           </p>
         </motion.div>
       </motion.div>
