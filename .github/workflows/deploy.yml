@@ -6,95 +6,120 @@ on:
       - master
 
 jobs:
-  deploy:
+  build-and-deploy:
+    name: Build and Deploy
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Deploy to EC2
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: '**/package-lock.json'
+
+      # 1. Build Client Locally (Much Faster than EC2)
+      - name: Install Client Dependencies
+        run: |
+          cd Client
+          npm ci --prefer-offline --no-audit
+
+      - name: Build Client
+        run: |
+          cd Client
+          # Empty API URL allows relative paths (handled by Nginx proxy)
+          export VITE_API_URL=""
+          # Increase memory for build
+          export NODE_OPTIONS="--max-old-space-size=4096"
+          npm run build
+
+      # 2. Prepare Artifacts for Transfer
+      - name: Prepare Deployment Artifacts
+        run: |
+          mkdir -p deploy_artifact
+          
+          # Copy Server (Code only, no node_modules)
+          cp -r Server deploy_artifact/
+          
+          # Copy Scripts
+          cp -r scripts deploy_artifact/
+          
+          # Copy Client Build (Only dist needed)
+          mkdir -p deploy_artifact/Client
+          cp -r Client/dist deploy_artifact/Client/
+          
+          # Cleanup any accidental node_modules in artifacts
+          rm -rf deploy_artifact/Server/node_modules
+          rm -rf deploy_artifact/Client/node_modules
+
+      # 3. Transfer Files to EC2 (SCP)
+      - name: Copy files to EC2
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "deploy_artifact/*"
+          target: "/home/ubuntu/Communiatec_Temp"
+          strip_components: 1
+
+      # 4. Finalize Deployment on EC2
+      - name: Deploy on EC2
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          timeout: 3600s
-          command_timeout: 3600s
           script: |
-            # 1. Install Dependencies if Node is missing (First time setup)
-            if ! command -v node &> /dev/null; then
-                echo "Installing Node.js and dependencies..."
-                curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-                sudo apt-get update
-                sudo apt-get install -y nodejs nginx git
-                sudo npm install -g pm2
+            APP_DIR="/home/ubuntu/Communiatec"
+            TEMP_DIR="/home/ubuntu/Communiatec_Temp"
+
+            echo "🚀 Starting Deployment..."
+
+            # Ensure App Directory Exists
+            mkdir -p $APP_DIR/Client
+            mkdir -p $APP_DIR/Server
+            mkdir -p $APP_DIR/scripts
+
+            # Sync Files (rsync is safer/faster for updates)
+            # Update Client Build
+            echo "📦 Updating Client Build..."
+            rsync -av --delete $TEMP_DIR/Client/dist/ $APP_DIR/Client/dist/
+            
+            # Update Server Code
+            echo "📦 Updating Server Code..."
+            rsync -av $TEMP_DIR/Server/ $APP_DIR/Server/
+            
+            # Update Scripts
+            rsync -av $TEMP_DIR/scripts/ $APP_DIR/scripts/
+            chmod +x $APP_DIR/scripts/*.sh
+
+            # Cleanup Temp
+            rm -rf $TEMP_DIR
+
+            # Server Setup
+            cd $APP_DIR/Server
+            
+            # Ensure .env exists
+            if [ ! -f ".env" ]; then
+                echo "⚠️ Creating default .env..."
+                echo "PORT=4000" > .env
+                echo "NODE_ENV=production" >> .env
             fi
 
-            # 2. Clone/Update Repo
-            APP_DIR="$HOME/Communiatec"
-            if [ ! -d "$APP_DIR" ]; then
-                echo "Cloning repository..."
-                git clone https://github.com/ketanayatti/Communiatec.git $APP_DIR
+            # Install Server Dependencies (Only if package.json changed)
+            echo "📦 Installing Server Dependencies..."
+            npm install --production --no-audit --prefer-offline
+
+            # Restart Application
+            echo "🔄 Restarting Server..."
+            if command -v pm2 &> /dev/null; then
+                pm2 restart communiatec-server --update-env || pm2 start server.js --name "communiatec-server" --env NODE_ENV=production
             else
-                echo "Repository already exists, pulling latest changes..."
-                cd $APP_DIR
-                git reset --hard HEAD
-                git fetch origin master
-                git reset --hard origin/master
+                npm install -g pm2
+                pm2 start server.js --name "communiatec-server" --env NODE_ENV=production
             fi
 
-            # 3. Verify scripts directory exists (with retry)
-            cd "$APP_DIR"
-            for attempt in 1 2 3; do
-                if [ -d "scripts" ]; then
-                    echo "scripts directory found on attempt $attempt"
-                    break
-                fi
-                echo "Attempt $attempt: scripts directory not found, checking git status..."
-                git status
-                git ls-files scripts/
-                sleep 1
-            done
-
-            # 4. Verify update script exists
-            if [ ! -f "scripts/update-app.sh" ]; then
-                echo "ERROR: update-app.sh not found"
-                echo "Current directory: $(pwd)"
-                echo "Directory contents:"
-                ls -la
-                echo "Scripts directory contents:"
-                ls -la scripts/ 2>&1 || echo "Cannot list scripts directory"
-                exit 1
-            fi
-
-            # 5. Make scripts executable
-            chmod +x scripts/update-app.sh scripts/setup-ec2.sh 2>/dev/null || true
-
-            # 6. Run Update Script
-            echo "Running update script..."
-            bash scripts/update-app.sh
-
-            # 7. Verify server is running
-            echo -e "\n📋 Post-deployment verification..."
-            sleep 5
-
-            # Check PM2 status
-            echo "PM2 Status:"
-            pm2 status
-
-            # Check if server is responding on port 4000
-            echo "Testing server on port 4000..."
-            for i in {1..5}; do
-                if curl -s http://localhost:4000/api/maintenance/status &>/dev/null; then
-                    echo "✅ Server is responding!"
-                    break
-                fi
-                echo "  Attempt $i: Waiting for server to start..."
-                sleep 2
-            done
-
-            # Show recent logs if server failed
-            if [ $? -ne 0 ]; then
-                echo "⚠️  Server may not be responding. Last 50 log lines:"
-                pm2 logs communiatec-server --lines 50 --nostream || echo "Cannot read logs"
-            fi
+            echo "✅ Deployment Complete!"
