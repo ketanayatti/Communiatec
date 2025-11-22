@@ -3,7 +3,8 @@ const mongoose = require("mongoose");
 const dbConnect = async () => {
   try {
     if (!process.env.DATABASE_URL) {
-      throw new Error("DATABASE_URL is not defined in environment variables");
+      console.warn("⚠️ DATABASE_URL is not defined in environment variables. Database features will be disabled.");
+      return;
     }
 
     const conn = await mongoose.connect(process.env.DATABASE_URL, {
@@ -13,8 +14,9 @@ const dbConnect = async () => {
 
     console.log(`MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
-    console.error(`Error: ${error.message}`);
-    process.exit(1); // Exit process with failure
+    console.error(`Error connecting to database: ${error.message}`);
+    console.warn("⚠️ Server starting without database connection. Some features may be unavailable.");
+    // Do NOT exit process, allow server to start for health checks
   }
 };
 

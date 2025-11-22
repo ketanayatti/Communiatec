@@ -205,6 +205,18 @@ app.use(
 // Maintenance status endpoint (must be before maintenance middleware)
 app.get("/api/maintenance/status", async (req, res) => {
   try {
+    // Check if DB is connected before querying
+    const mongoose = require("mongoose");
+    if (mongoose.connection.readyState !== 1) {
+      console.warn("⚠️ DB not connected, returning default maintenance status");
+      return res.json({
+        maintenanceMode: false,
+        timestamp: new Date().toISOString(),
+        server: "online",
+        warning: "database_disconnected"
+      });
+    }
+
     const settings = await Setting.findOne();
     console.log("📋 Maintenance status checked at:", new Date().toISOString());
     res.json({
@@ -255,13 +267,22 @@ app.use("/api/zoro", require("./routes/zoroRoutes"));
 
 // Health check endpoint (bypasses maintenance in the middleware itself)
 app.get("/api/health", (req, res) => {
+  const mongoose = require("mongoose");
+  const dbState = mongoose.connection.readyState;
+  const dbStatus = {
+    0: "disconnected",
+    1: "connected",
+    2: "connecting",
+    3: "disconnecting",
+  };
+
   res.json({
     status: "OK",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || "development",
     services: {
-      database: "connected",
+      database: dbStatus[dbState] || "unknown",
       redis: "not configured",
       code_collaboration: "enabled",
     },
@@ -442,11 +463,11 @@ io.on("connection", (socket) => {
 const PORT = process.env.PORT || 4000;
 
 const startServer = async () => {
-  try {
-    await dbConnect();
+  // Attempt database connection but don't block server start on failure
+  await dbConnect();
 
-    server.listen(PORT, () => {
-      console.log("🚀 Communiatec Server Started!");
+  server.listen(PORT, () => {
+    console.log("🚀 Communiatec Server Started!");
       console.log("=".repeat(50));
       console.log(`📡 Server running on: http://localhost:${PORT}`);
       console.log(`💬 Chat API: http://localhost:${PORT}/api/message`);
@@ -486,10 +507,6 @@ const startServer = async () => {
         });
       }
     });
-  } catch (error) {
-    console.error("Failed to start server:", error);
-    process.exit(1);
-  }
 };
 
 startServer();
