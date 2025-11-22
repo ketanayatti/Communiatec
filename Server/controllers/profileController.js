@@ -9,9 +9,13 @@ const updateProfile = async (req, res) => {
   try {
     const { id } = req;
 
+    // Log the incoming request body for debugging
+    console.log("📝 Update Profile Request Body:", req.body);
+
     // Validate input using Joi
     const { error } = updateProfileSchema.validate(req.body);
     if (error) {
+      console.log("❌ Validation Error:", error.details[0].message);
       return res.status(400).json({ error: error.details[0].message });
     }
 
