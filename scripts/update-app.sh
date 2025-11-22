@@ -47,7 +47,8 @@ npm install
 # Restart PM2 process with environment variables
 export NODE_ENV=production
 export NODE_OPTIONS="--max-old-space-size=512"
-pm2 restart communiatec-server || pm2 start server.js --name "communiatec-server" --env NODE_ENV=production
+# Use --update-env to ensure new PORT/env vars are picked up
+pm2 restart communiatec-server --update-env || pm2 start server.js --name "communiatec-server" --env NODE_ENV=production
 
 echo "   Waiting for server to stabilize..."
 sleep 3
