@@ -11,7 +11,7 @@ const updateProfileSchema = Joi.object({
     "string.max": "Last name cannot exceed 50 characters",
     "any.required": "Last name is required",
   }),
-});
+}).unknown(true);
 
 module.exports = {
   updateProfileSchema,
