@@ -1,16 +1,18 @@
 <div align="center">
 
   <!-- Header Animation/Logo Area -->
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=00BFFF&height=200&section=header&text=Communiatec&fontSize=80&animation=fadeIn&fontAlignY=35&desc=Secure%20Real-Time%20Collaboration%20Platform&descAlignY=55&descAlign=50" alt="Communiatec Header" width="100%"/>
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=00BFFF&height=200&section=header&text=Communiatec&fontSize=80&animation=fadeIn&fontAlignY=35&desc=A%20Platform%20for%20Community%20Connection&descAlignY=55&descAlign=50" alt="Communiatec Header" width="100%"/>
   
   <h3>
-    <a href="#-about-the-project">View Demo</a>
+    <a href="#-about-the-project">About</a>
     <span> | </span>
     <a href="#-installation">Installation</a>
     <span> | </span>
     <a href="#-key-features">Features</a>
     <span> | </span>
-    <a href="#-security-architecture">Security</a>
+    <a href="#-security">Security</a>
+    <span> | </span>
+    <a href="#-architecture-diagram">Architecture Diagram</a>
   </h3>
 
   <br />
@@ -20,108 +22,65 @@
 
 ## 🚀 About The Project
 
-**Communiatec** is a next-generation collaboration platform engineered for security-conscious communities and institutes. It bridges the gap between seamless real-time interaction and enterprise-grade security.
+**Communiatec** is a next-generation platform engineered for communities and institutes to connect, collaborate, and grow together. It bridges the gap between seamless real-time interaction and meaningful community engagement.
 
-Built on the **MERN Stack** and powered by **Socket.io**, it features a robust **Defense-in-Depth** architecture, ensuring that your chats, files, and code remain private and protected. Whether you are debugging code with a peer or storing sensitive documents in the **Zoro Vault**, Communiatec has you covered.
+Built on the **MERN Stack** and powered by **Socket.io**, it features a robust architecture for chats, file sharing, and collaborative coding. Whether you are brainstorming with peers or storing important documents in the **Zoro Vault**, Communiatec has you covered.
+
+---
+
+## 🌐 Live Demo
+
+- [Access the Live Demo](https://communiatec-demo.vercel.app)
+
+---
+
+## 🗺️ Architecture Diagram & Understanding
+
+- [System Architecture Diagram](architecture.mmd)
+- [Security Architecture Diagram](security-architecture.mmd)
+- [Deployment & System Understanding](DEPLOYMENT.md)
 
 ---
 
 ## ⚡ Key Features
 
-<div align="center">
-  <table>
-    <tr>
-      <td align="center" width="33%">
-        <h3>💬 AI-Powered Chat</h3>
-        <img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExODliNTYyNzY1ODEzZjM5N2Q5ZDM5ZDM5ZDM5ZDM5ZDM5ZDM5ZDM5ZCZlcD12MV9pbnRlcm5hbF9naWZzX2dpZklkJmN0PXM/L1R1TVThZA8krMl0LR/giphy.gif" width="50px" alt="Chat"/>
-        <br/>
-        Real-time messaging integrated with <b>Gemini AI</b> for smart suggestions and assistance.
-      </td>
-      <td align="center" width="33%">
-        <h3>🔐 Zoro Vault</h3>
-        <img src="https://cdn-icons-png.flaticon.com/512/2460/2460875.png" width="50px" alt="Vault"/>
-        <br/>
-        Secure cloud storage protected by <b>AES-256-GCM</b> encryption and AWS S3.
-      </td>
-      <td align="center" width="33%">
-        <h3>💻 Code Studio</h3>
-        <img src="https://cdn-icons-png.flaticon.com/512/1005/1005141.png" width="50px" alt="Code"/>
-        <br/>
-        Live collaborative coding environment with multi-user cursors and syntax highlighting.
-      </td>
-    </tr>
-    <tr>
-      <td align="center" width="33%">
-        <h3>🛡️ Fortress Security</h3>
-        <img src="https://cdn-icons-png.flaticon.com/512/2092/2092663.png" width="50px" alt="Security"/>
-        <br/>
-        <b>RBAC</b>, Rate Limiting, Input Sanitization, and HTTP-Only Cookies.
-      </td>
-      <td align="center" width="33%">
-        <h3>☕ Coffee Break</h3>
-        <img src="https://cdn-icons-png.flaticon.com/512/751/751621.png" width="50px" alt="Coffee"/>
-        <br/>
-        Casual spaces for team bonding and informal discussions.
-      </td>
-      <td align="center" width="33%">
-        <h3>📊 Admin Dashboard</h3>
-        <img src="https://cdn-icons-png.flaticon.com/512/2328/2328966.png" width="50px" alt="Admin"/>
-        <br/>
-        Comprehensive control over users, groups, and system settings.
-      </td>
-    </tr>
-  </table>
-</div>
+- **Community Hubs:** Create public and private spaces with threaded conversations, pinned resources, topic discovery, and member roles.
+- **AI-Powered Assistance:** Gemini-driven smart replies, summarization, context-aware suggestions, and moderation helpers to keep discussions productive.
+- **Presence & Live Interaction:** Low-latency messaging, presence indicators, typing notifications, and delivery acknowledgements powered by Socket.io.
+- **Zoro Vault:** Encrypted file storage (AES-256-GCM) with secure key derivation and safe sharing workflows for community assets.
+- **Collaborative Code Studio:** Real-time multi-user editing, shared sessions, and persistent workspaces for workshops and pair programming.
+- **Moderation & Admin Tools:** Role-based access control, audit logging, user and content moderation workflows, and usage analytics.
+- **Extensible Integrations:** Webhooks, REST APIs, OAuth connectors, and plugin-friendly hooks for integrations and automations.
+- **Scalability & Resilience:** Containerized services, horizontal scaling patterns, health probes, and graceful degradation strategies.
+- **DevOps-Ready:** CI/CD pipelines, automated image builds and scans, Infrastructure-as-Code templates, and deployment scripts.
+- **Observability & Reliability:** Centralized logging, metrics, tracing, health checks, and alerting for fast incident response.
+- **Accessibility & Internationalization:** ARIA-friendly UI patterns and i18n-ready strings for inclusive, global communities.
 
 ---
 
 ## 🛠️ Tech Stack
 
-<div align="center">
-
-|                                                      Frontend                                                       |                                                    Backend                                                    |                                            Infrastructure                                             |                                          Security                                           |
-| :-----------------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------: | :---------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------: |
-|         ![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)         |    ![NodeJS](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)    |  ![AWS](https://img.shields.io/badge/AWS-232F3E?style=for-the-badge&logo=amazon-aws&logoColor=white)  | ![JWT](https://img.shields.io/badge/JWT-black?style=for-the-badge&logo=JSON%20web%20tokens) |
-| ![Tailwind](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white) |                ![Express](https://img.shields.io/badge/Express.js-404D59?style=for-the-badge)                 | ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white) |         ![AES-256](https://img.shields.io/badge/AES_256-0052CC?style=for-the-badge)         |
-|           ![Vite](https://img.shields.io/badge/Vite-B73BFE?style=for-the-badge&logo=vite&logoColor=white)           |   ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)    |  ![Nginx](https://img.shields.io/badge/Nginx-009639?style=for-the-badge&logo=nginx&logoColor=white)   |         ![OAuth](https://img.shields.io/badge/OAuth-2.0-white?style=for-the-badge)          |
-|   ![Socket.io](https://img.shields.io/badge/Socket.io-black?style=for-the-badge&logo=socket.io&badgeColor=010101)   | ![Gemini](https://img.shields.io/badge/Gemini_AI-8E75B2?style=for-the-badge&logo=google-bard&logoColor=white) |                                                                                                       |                                                                                             |
-
-</div>
-
----
-
-## 📂 Project Structure
-
-```bash
-Communiatec/
-├── Client/                 # React Frontend
-│   ├── src/
-│   │   ├── components/     # Reusable UI components
-│   │   ├── pages/          # Application pages (Chat, Vault, etc.)
-│   │   ├── store/          # Redux state management
-│   │   └── lib/            # Utilities and API clients
-│   └── ...
-├── Server/                 # Node.js Backend
-│   ├── config/             # Database and Cloudinary config
-│   ├── controllers/        # Request handlers
-│   ├── middlewares/        # Security and Auth middleware
-│   ├── models/             # Mongoose schemas
-│   ├── routes/             # API endpoints
-│   ├── socket-handlers/    # Real-time logic
-│   └── ...
-└── README.md
-```
+- **Frontend:** React (Vite), Tailwind CSS, TypeScript-ready, React Router, Socket.io-client for realtime UX
+- **Backend:** Node.js, Express, Socket.io, Mongoose (MongoDB), background workers for async tasks
+- **AI & Data:** Gemini integrations for suggestions, summarization, and background processing pipelines
+- **DevOps & Infrastructure:** Docker, GitHub Actions (CI/CD), Container Registry, AWS (S3, EC2/ECS), Nginx, Terraform (IaC) or CloudFormation
+- **Observability & Monitoring:** Structured logging (Winston / Logstash), Metrics (Prometheus), Dashboards (Grafana), Error tracking (Sentry)
+- **Testing & QA:** Unit testing with Jest, integration tests with Supertest, E2E with Playwright or Cypress
+- **Security:** AES-256-GCM for vaults, PBKDF2 for key derivation, JWT, OAuth 2.0, Helmet, rate limiting, input sanitization
+- **Storage & Media:** MongoDB for application data, S3-compatible object storage for files and media with lifecycle policies
+- **Extensibility & Integrations:** Webhooks, REST APIs, OAuth connectors, plugin hooks and event-driven architecture
+- **Mobile & Offline:** Mobile-ready design (React Native planned), offline-first sync patterns and caching strategies
 
 ---
 
-## 🔒 Security Architecture
+## 🔒 Security
 
-Communiatec employs a **Defense-in-Depth** strategy:
+Communiatec employs multiple layers of protection:
 
-1.  **Identity:** Zero Trust authentication via JWTs in Secure, HTTP-Only cookies.
-2.  **Encryption:** Custom AES-256-GCM module with PBKDF2 key derivation for the Vault.
-3.  **Network:** Nginx reverse proxy for traffic filtering and SSL termination.
-4.  **Application:** Helmet.js headers, Rate Limiting, and strict Input Sanitization (NoSQL/XSS).
+- **Identity:** JWT authentication in secure, HTTP-only cookies
+- **Encryption:** AES-256-GCM for vault storage
+- **Network:** Nginx reverse proxy and SSL termination
+- **Application:** Helmet.js headers, rate limiting, and input sanitization
 
 ---
 
@@ -170,16 +129,13 @@ npm run dev
 
 ---
 
-## 📸 Screenshots
+## 📢 Recent Changes
 
-<div align="center">
-  <!-- Replace these with actual screenshots when available -->
-  <img src="https://placehold.co/600x400/1a1a1a/FFF?text=Chat+Interface" alt="Chat Interface" width="45%" />
-  <img src="https://placehold.co/600x400/1a1a1a/FFF?text=Code+Editor" alt="Code Editor" width="45%" />
-  <br/><br/>
-  <img src="https://placehold.co/600x400/1a1a1a/FFF?text=Zoro+Vault" alt="Zoro Vault" width="45%" />
-  <img src="https://placehold.co/600x400/1a1a1a/FFF?text=Admin+Dashboard" alt="Admin Dashboard" width="45%" />
-</div>
+- Improved security middleware and audit logging
+- Enhanced Zoro Vault encryption and file upload reliability
+- Added Gemini AI-powered chat suggestions
+- Refactored code editor for better multi-user collaboration
+- Updated deployment scripts and Dockerfiles for easier cloud setup
 
 ---
 
