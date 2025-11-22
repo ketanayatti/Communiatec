@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -20,52 +22,88 @@ jobs:
           cache: "npm"
           cache-dependency-path: "**/package-lock.json"
 
-      # 1. Build Client Locally (Much Faster than EC2)
+      - name: Check for Client Changes
+        id: changes
+        run: |
+          # Check if Client files changed in the last commit
+          if git diff --name-only HEAD^ HEAD | grep -q "Client/"; then
+            echo "client_changed=true" >> $GITHUB_OUTPUT
+            echo "📝 Client files changed - Build required."
+          else
+            echo "client_changed=false" >> $GITHUB_OUTPUT
+            echo "⏩ No Client changes - Skipping build."
+          fi
+
+      # 1. Cache & Install (Only if Client changed)
+      - name: Cache Client Dependencies
+        if: steps.changes.outputs.client_changed == 'true'
+        id: client-cache
+        uses: actions/cache@v3
+        with:
+          path: Client/node_modules
+          key: ${{ runner.os }}-client-${{ hashFiles('Client/package-lock.json') }}
+
       - name: Install Client Dependencies
+        if: steps.changes.outputs.client_changed == 'true' && steps.client-cache.outputs.cache-hit != 'true'
         run: |
           cd Client
           npm ci --prefer-offline --no-audit
 
+      # 2. Build Client (Only if Client changed)
       - name: Build Client
+        if: steps.changes.outputs.client_changed == 'true'
         run: |
           cd Client
-          # Empty API URL allows relative paths (handled by Nginx proxy)
           export VITE_API_URL=""
-          # Increase memory for build
           export NODE_OPTIONS="--max-old-space-size=4096"
           npm run build
 
-      # 2. Prepare Artifacts for Transfer
+      # 3. Prepare Artifacts
       - name: Prepare Deployment Artifacts
         run: |
           mkdir -p deploy_artifact
 
-          # Copy Server (Code only, no node_modules)
-          cp -r Server deploy_artifact/
+          # Copy Server
+          echo "📦 Copying Server files..."
+          rsync -av --exclude='node_modules' \
+                    --exclude='logs' \
+                    --exclude='uploads' \
+                    --exclude='.env' \
+                    --exclude='.git' \
+                    --exclude='tmp' \
+                    Server deploy_artifact/
 
           # Copy Scripts
           cp -r scripts deploy_artifact/
 
-          # Copy Client Build (Only dist needed)
-          mkdir -p deploy_artifact/Client
-          cp -r Client/dist deploy_artifact/Client/
+          # Copy Client Build (Only if built)
+          if [ "${{ steps.changes.outputs.client_changed }}" == "true" ]; then
+            echo "📦 Including new Client build..."
+            mkdir -p deploy_artifact/Client
+            cp -r Client/dist deploy_artifact/Client/
+            touch deploy_artifact/.client_updated
+          else
+            echo "⏩ Skipping Client build inclusion."
+          fi
 
-          # Cleanup any accidental node_modules in artifacts
-          rm -rf deploy_artifact/Server/node_modules
-          rm -rf deploy_artifact/Client/node_modules
+          echo "📊 Artifact Size:"
+          du -sh deploy_artifact/
 
-      # 3. Transfer Files to EC2 (SCP)
-      - name: Copy files to EC2
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "deploy_artifact/*"
-          target: "/home/ubuntu/Communiatec_Temp"
-          strip_components: 1
+      # 4. Transfer Files to EC2
+      - name: Copy files to EC2 via Rsync
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
-      # 4. Finalize Deployment on EC2
+          echo "🚀 Syncing files to EC2..."
+          rsync -avz --delete \
+            -e "ssh -o StrictHostKeyChecking=no" \
+            deploy_artifact/ \
+            ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}:/home/ubuntu/Communiatec_Temp/
+
+      # 5. Finalize Deployment
       - name: Deploy on EC2
         uses: appleboy/ssh-action@master
         with:
@@ -78,42 +116,57 @@ jobs:
 
             echo "🚀 Starting Deployment..."
 
-            # Ensure App Directory Exists
+            # Ensure Directories
             mkdir -p $APP_DIR/Client
             mkdir -p $APP_DIR/Server
             mkdir -p $APP_DIR/scripts
 
-            # Sync Files (rsync is safer/faster for updates)
-            # Update Client Build
-            echo "📦 Updating Client Build..."
-            rsync -av --delete $TEMP_DIR/Client/dist/ $APP_DIR/Client/dist/
+            # 1. Update Client (Conditional)
+            if [ -f "$TEMP_DIR/.client_updated" ]; then
+                echo "📦 Found new Client build, updating..."
+                # Ensure target dist exists
+                mkdir -p $APP_DIR/Client/dist
+                # Sync dist folder
+                rsync -av --delete $TEMP_DIR/Client/dist/ $APP_DIR/Client/dist/
+            else
+                echo "⏩ No new Client build, keeping existing version."
+            fi
 
-            # Update Server Code
+            # 2. Update Server Code
             echo "📦 Updating Server Code..."
             rsync -av $TEMP_DIR/Server/ $APP_DIR/Server/
-
-            # Update Scripts
+            
+            # 3. Update Scripts
             rsync -av $TEMP_DIR/scripts/ $APP_DIR/scripts/
             chmod +x $APP_DIR/scripts/*.sh
 
-            # Cleanup Temp
+            # Cleanup
             rm -rf $TEMP_DIR
 
-            # Server Setup
+            # 4. Server Setup
             cd $APP_DIR/Server
-
-            # Ensure .env exists
+            
             if [ ! -f ".env" ]; then
-                echo "⚠️ Creating default .env..."
                 echo "PORT=4000" > .env
                 echo "NODE_ENV=production" >> .env
             fi
 
-            # Install Server Dependencies (Only if package.json changed)
-            echo "📦 Installing Server Dependencies..."
-            npm install --production --no-audit --prefer-offline
+            # Smart Install: Only if package.json changed
+            if [ -f "package.json" ]; then
+                # Check if node_modules exists
+                if [ ! -d "node_modules" ]; then
+                    echo "📦 Installing Server Dependencies (Fresh)..."
+                    npm install --production --no-audit --prefer-offline
+                else
+                    # Simple check: has package.json changed since last run?
+                    # For now, we'll just run install, it's fast if cached.
+                    # To be super fast, we could use a checksum, but npm install is okay here.
+                    echo "📦 Checking Server Dependencies..."
+                    npm install --production --no-audit --prefer-offline
+                fi
+            fi
 
-            # Restart Application
+            # 5. Restart
             echo "🔄 Restarting Server..."
             if command -v pm2 &> /dev/null; then
                 pm2 restart communiatec-server --update-env || pm2 start server.js --name "communiatec-server" --env NODE_ENV=production
