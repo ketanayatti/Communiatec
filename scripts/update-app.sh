@@ -37,7 +37,9 @@ ENVEOF
 fi
 
 # Ensure PORT is set to 4000 for production
-if ! grep -q "^PORT=" .env; then
+if grep -q "^PORT=" .env; then
+    sed -i 's/^PORT=.*/PORT=4000/' .env
+else
     echo "PORT=4000" >> .env
 fi
 
