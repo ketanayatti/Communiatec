@@ -436,51 +436,62 @@ io.on("connection", (socket) => {
 // Rest of your server setup remains the same...
 
 // Connect to database
-dbConnect();
+// dbConnect(); // Moved to startServer
 
 // ✨ ENHANCED: Server startup with better logging
 const PORT = process.env.PORT || 4000;
 
-server.listen(PORT, () => {
-  console.log("🚀 Communiatec Server Started!");
-  console.log("=".repeat(50));
-  console.log(`📡 Server running on: http://localhost:${PORT}`);
-  console.log(`💬 Chat API: http://localhost:${PORT}/api/message`);
-  console.log(`👤 Auth API: http://localhost:${PORT}/api/auth`);
-  console.log(`💻 Code Collaboration: http://localhost:${PORT}/api/code`);
-  console.log(`🏥 Health Check: http://localhost:${PORT}/api/health`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
-  console.log(`🔌 Socket.io enabled for real-time features`);
-  console.log("=".repeat(50));
+const startServer = async () => {
+  try {
+    await dbConnect();
+    
+    server.listen(PORT, () => {
+      console.log("🚀 Communiatec Server Started!");
+      console.log("=".repeat(50));
+      console.log(`📡 Server running on: http://localhost:${PORT}`);
+      console.log(`💬 Chat API: http://localhost:${PORT}/api/message`);
+      console.log(`👤 Auth API: http://localhost:${PORT}/api/auth`);
+      console.log(`💻 Code Collaboration: http://localhost:${PORT}/api/code`);
+      console.log(`🏥 Health Check: http://localhost:${PORT}/api/health`);
+      console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+      console.log(`🔌 Socket.io enabled for real-time features`);
+      console.log("=".repeat(50));
 
-  // Start keepalive mechanism for Render free tier
-  if (process.env.NODE_ENV === "production") {
-    console.log("🏃‍♂️ Starting server keepalive mechanism...");
+      // Start keepalive mechanism for Render free tier
+      if (process.env.NODE_ENV === "production") {
+        console.log("🏃‍♂️ Starting server keepalive mechanism...");
 
-    // Self-ping every 10 minutes to prevent sleep (Render sleeps after 15 minutes)
-    const keepAliveInterval = setInterval(() => {
-      const serverUrl = process.env.SERVER_URL || `http://localhost:${PORT}`;
+        // Self-ping every 10 minutes to prevent sleep (Render sleeps after 15 minutes)
+        const keepAliveInterval = setInterval(() => {
+          const serverUrl = process.env.SERVER_URL || `http://localhost:${PORT}`;
 
-      // Use fetch or http to ping our own server
-      fetch(`${serverUrl}/api/keepalive`)
-        .then(() => {
-          console.log("✅ Keepalive ping successful");
-        })
-        .catch((error) => {
-          console.log("⚠️  Keepalive ping failed:", error.message);
+          // Use fetch or http to ping our own server
+          fetch(`${serverUrl}/api/keepalive`)
+            .then(() => {
+              console.log("✅ Keepalive ping successful");
+            })
+            .catch((error) => {
+              console.log("⚠️  Keepalive ping failed:", error.message);
+            });
+        }, 10 * 60 * 1000); // 10 minutes
+
+        // Clear interval on server shutdown
+        process.on("SIGTERM", () => {
+          clearInterval(keepAliveInterval);
         });
-    }, 10 * 60 * 1000); // 10 minutes
 
-    // Clear interval on server shutdown
-    process.on("SIGTERM", () => {
-      clearInterval(keepAliveInterval);
+        process.on("SIGINT", () => {
+          clearInterval(keepAliveInterval);
+        });
+      }
     });
-
-    process.on("SIGINT", () => {
-      clearInterval(keepAliveInterval);
-    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
   }
-});
+};
+
+startServer();
 
 // ✨ ENHANCED: Graceful shutdown handling
 process.on("SIGTERM", () => {
