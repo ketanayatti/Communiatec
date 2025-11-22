@@ -89,19 +89,16 @@ jobs:
           echo "📊 Artifact Size:"
           du -sh deploy_artifact/
 
-      # 4. Transfer Files to EC2
-      - name: Copy files to EC2 via Rsync
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
-
-          echo "🚀 Syncing files to EC2..."
-          rsync -avz --delete \
-            -e "ssh -o StrictHostKeyChecking=no" \
-            deploy_artifact/ \
-            ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}:/home/ubuntu/Communiatec_Temp/
+      # 4. Transfer Files to EC2 (SCP - Reliable & Fast with Optimized Artifacts)
+      - name: Copy files to EC2
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "deploy_artifact/*"
+          target: "/home/ubuntu/Communiatec_Temp"
+          strip_components: 1
 
       # 5. Finalize Deployment
       - name: Deploy on EC2
@@ -135,7 +132,7 @@ jobs:
             # 2. Update Server Code
             echo "📦 Updating Server Code..."
             rsync -av $TEMP_DIR/Server/ $APP_DIR/Server/
-            
+
             # 3. Update Scripts
             rsync -av $TEMP_DIR/scripts/ $APP_DIR/scripts/
             chmod +x $APP_DIR/scripts/*.sh
@@ -145,7 +142,7 @@ jobs:
 
             # 4. Server Setup
             cd $APP_DIR/Server
-            
+
             if [ ! -f ".env" ]; then
                 echo "PORT=4000" > .env
                 echo "NODE_ENV=production" >> .env
