@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import { useStore } from "@/store/store.js";
 import { io } from "socket.io-client";
+import { getBaseUrl } from "@/lib/apiClient";
 import { toast } from "sonner";
 import { parseISO, format } from "date-fns";
 
@@ -41,8 +42,7 @@ export const SocketProvider = ({ children }) => {
   // Chat Socket (existing functionality)
   useEffect(() => {
     if (userInfo) {
-      const SOCKET_URL =
-        import.meta.env.VITE_API_URL || "http://localhost:4000";
+      const SOCKET_URL = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}${window.location.port ? ":" + window.location.port : ""}`;
       socket.current = io(SOCKET_URL, {
         withCredentials: true,
         query: {
@@ -365,7 +365,7 @@ export const SocketProvider = ({ children }) => {
     console.log("🔌 Initializing code collaboration socket...");
 
     // Create connection to /code namespace
-    const SOCKET_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
+    const SOCKET_URL = getBaseUrl();
     const codeSocketInstance = io(`${SOCKET_URL}/code`, {
       withCredentials: true,
       auth: {

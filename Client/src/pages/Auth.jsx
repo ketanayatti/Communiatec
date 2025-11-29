@@ -171,16 +171,14 @@ const Auth = () => {
   const handleGithubLogin = () => {
     const serverUrl =
       import.meta.env.VITE_API_URL ||
-      import.meta.env.VITE_APP_SERVER_URL ||
-      "http://localhost:4000";
+      import.meta.env.VITE_APP_SERVER_URL || getBaseUrl();
     window.location.href = `${serverUrl}/api/auth/github`;
   };
 
   const handleLinkedInLogin = () => {
     const serverUrl =
       import.meta.env.VITE_API_URL ||
-      import.meta.env.VITE_APP_SERVER_URL ||
-      "http://localhost:4000";
+      import.meta.env.VITE_APP_SERVER_URL || getBaseUrl();
     window.location.href = `${serverUrl}/api/auth/linkedin`;
   };
 

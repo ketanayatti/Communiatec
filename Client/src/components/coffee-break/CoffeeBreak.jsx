@@ -19,6 +19,7 @@ import {
   Shield,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { getBaseUrl } from "@/lib/apiClient";
 
 const CoffeeBreak = () => {
   const { userInfo } = useStore();
@@ -40,8 +41,7 @@ const CoffeeBreak = () => {
 
   useEffect(() => {
     if (userInfo && !socket.current) {
-      const SOCKET_URL =
-        import.meta.env.VITE_API_URL || "http://localhost:4000";
+      const SOCKET_URL = getBaseUrl();
       socket.current = io(`${SOCKET_URL}/coffee-break`, {
         query: {
           userId: userInfo._id,

@@ -6,7 +6,7 @@ const getToken = () => {
 };
 
 // Use environment variable for API URL, or dynamic determination based on window location
-const getBaseUrl = () => {
+export const getBaseUrl = () => {
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
