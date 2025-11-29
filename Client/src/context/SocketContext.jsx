@@ -1,5 +1,11 @@
 // Client/src/context/SocketContext.jsx
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useStore } from "@/store/store.js";
 import { io } from "socket.io-client";
 import { toast } from "sonner";
