@@ -37,12 +37,42 @@ jobs:
           npm ci --prefer-offline --no-audit
 
       # 2. Build Client (Always)
-      - name: Build Client
+      - name: Build Client (with automatic retry on failure)
         run: |
+          set -e
           cd Client
           export VITE_API_URL=""
           export NODE_OPTIONS="--max-old-space-size=4096"
-          npm run build
+
+          echo "📦 Running initial client build..."
+          if npm run build; then
+            echo "✅ Client build succeeded."
+          else
+            echo "⚠️ Initial client build failed. Attempting clean reinstall and rebuild..."
+            rm -rf node_modules package-lock.json
+            npm ci --prefer-offline --no-audit
+            echo "🔁 Rebuilding client after clean install..."
+            if npm run build; then
+              echo "✅ Client rebuild succeeded after clean install."
+            else
+              echo "❌ Client build failed after retry. Aborting." >&2
+              exit 1
+            fi
+          fi
+
+      - name: Detect & Fix Duplicate React Versions (if any)
+        run: |
+          set -e
+          cd Client
+          echo "🔎 Checking for multiple React versions in node_modules..."
+          node -e "const fs=require('fs'),path=require('path');const versions=new Set();function walk(dir){if(!fs.existsSync(dir))return;for(const f of fs.readdirSync(dir)){const p=path.join(dir,f);try{if(fs.statSync(p).isDirectory()){if(f==='react'){const pj=path.join(p,'package.json');if(fs.existsSync(pj)){versions.add(JSON.parse(fs.readFileSync(pj,'utf8')).version)}}walk(p)}}catch(e){}}}walk('node_modules');if(versions.size>1){console.error('Multiple react versions found:',Array.from(versions));process.exit(1);}else{console.log('React versions OK:',Array.from(versions));process.exit(0);}" || (
+            echo "⚠️ Multiple React versions detected or check failed. Attempting to dedupe and rebuild..."
+            npm dedupe || true
+            rm -rf node_modules package-lock.json
+            npm ci --prefer-offline --no-audit
+            echo "🔁 Rebuilding client after dedupe and clean install..."
+            npm run build
+          )
 
       # 3. Prepare Artifacts
       - name: Prepare Deployment Artifacts
