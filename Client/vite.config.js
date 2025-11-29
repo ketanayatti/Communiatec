@@ -44,6 +44,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      react: path.resolve(__dirname, "./node_modules/react"),
+      "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
     },
     dedupe: [
       "react",
@@ -116,6 +118,7 @@ export default defineConfig({
     include: [
       "react",
       "react-dom",
+      "react-dom/client",
       "react/jsx-runtime",
       "socket.io-client",
       "sonner",
@@ -124,5 +127,14 @@ export default defineConfig({
       "monaco-editor",
     ],
     exclude: [],
+    esbuildOptions: {
+      define: {
+        global: "globalThis",
+      },
+    },
+  },
+  define: {
+    "process.env.NODE_ENV": '"production"',
+    global: "globalThis",
   },
 });
