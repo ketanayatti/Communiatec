@@ -15,7 +15,7 @@ jobs:
   build-and-deploy:
     name: Build and Deploy
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 50
 
     steps:
       # ============ CHECKOUT & SETUP ============
@@ -26,223 +26,193 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: "Client/package-lock.json"
 
-      # ============ DETECT & FIX DEPENDENCY ISSUES ============
-      - name: Detect Duplicate Dependencies
+      # ============ CLIENT BUILD ============
+      - name: Clean Client Dependencies
         working-directory: Client
         run: |
-          echo "🔍 Scanning for duplicate dependencies..."
-
-          # Create a script to find duplicate packages
-          node -e "
-          const fs = require('fs');
-          const path = require('path');
-
-          const getVersion = (dir) => {
-            try {
-              const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
-              return pkg.version;
-            } catch { return null; }
-          };
-
-          const findDuplicates = (dir, duplicates = {}) => {
-            if (!fs.existsSync(dir)) return duplicates;
-            
-            const entries = fs.readdirSync(dir);
-            for (const entry of entries) {
-              const fullPath = path.join(dir, entry);
-              try {
-                if (fs.statSync(fullPath).isDirectory()) {
-                  const pkgPath = path.join(fullPath, 'package.json');
-                  if (fs.existsSync(pkgPath)) {
-                    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-                    if (!duplicates[pkg.name]) duplicates[pkg.name] = [];
-                    duplicates[pkg.name].push({ version: pkg.version, path: fullPath });
-                  }
-                  findDuplicates(fullPath, duplicates);
-                }
-              } catch (e) {}
-            }
-            return duplicates;
-          };
-
-          const dups = findDuplicates('node_modules');
-          let hasDuplicates = false;
-          for (const [pkg, versions] of Object.entries(dups)) {
-            if (versions.length > 1) {
-              console.log('⚠️ Duplicate:', pkg, versions.map(v => v.version).join(', '));
-              hasDuplicates = true;
-            }
-          }
-          process.exit(hasDuplicates ? 1 : 0);
-          " || echo "⚠️ Duplicates detected, will rebuild fresh"
-
-      - name: Clean and Rebuild Client Dependencies
-        working-directory: Client
-        run: |
-          echo "🧹 Cleaning previous installations..."
+          echo "🧹 Cleaning previous builds and dependencies..."
           rm -rf node_modules package-lock.json npm-shrinkwrap.json .npmrc
-          rm -rf .vite dist
-          rm -rf .next  # if using Next.js
+          rm -rf .vite dist .next build
+          echo "✅ Cleanup complete"
 
-          echo "🔧 Configuring npm..."
-          npm config set legacy-peer-deps=true --legacy-peer-deps
-          npm config set fetch-timeout=60000
+      - name: Configure NPM Registry
+        run: |
+          echo "🔧 Configuring npm for optimal builds..."
+          npm config set registry https://registry.npmjs.org/
+          npm config set legacy-peer-deps=true
+          npm config set fetch-timeout=120000
           npm config set fetch-retry-mintimeout=20000
           npm config set fetch-retry-maxtimeout=120000
+          npm config set audit=false
 
-          echo "📦 Installing dependencies..."
-          npm install --prefer-offline --no-audit --legacy-peer-deps
-
-          # Install specific versions to avoid runtime issues
-          echo "🔨 Installing react ecosystem with compatible versions..."
-          npm install react@18.3.1 react-dom@18.3.1 --legacy-peer-deps --save
-
-          # Install sonner with latest
-          echo "🔨 Installing sonner..."
-          npm install sonner@latest --save --legacy-peer-deps
-
-          if [ ! -f "package-lock.json" ]; then
-            echo "❌ package-lock.json not created"
-            exit 1
-          fi
-
-          echo "✅ Dependencies installed successfully"
-
-      - name: Validate & Fix Missing Dependencies
+      - name: Install Client Dependencies
         working-directory: Client
         run: |
-          echo "🔍 Checking for missing dependencies..."
+          echo "📦 Installing client dependencies..."
+          npm ci --legacy-peer-deps --prefer-offline --no-audit
 
-          # Get list of imports from source files
-          MISSING_DEPS=()
+          if [ ! -f "package-lock.json" ]; then
+            echo "❌ package-lock.json not generated"
+            exit 1
+          fi
+          echo "✅ Dependencies installed successfully"
 
-          # Check for commonly problematic packages (including sonner)
-          CRITICAL_PACKAGES=("monaco-editor" "three" "@monaco-editor/react" "sonner")
+      - name: Verify Critical Dependencies
+        working-directory: Client
+        run: |
+          echo "🔍 Verifying critical dependencies..."
 
-          for pkg in "${CRITICAL_PACKAGES[@]}"; do
-            if grep -r "from ['\"]$pkg['\"]" src/ 2>/dev/null | grep -q .; then
-              if ! npm list "$pkg" 2>/dev/null | grep -q "$pkg@"; then
-                echo "⚠️ Missing: $pkg"
-                MISSING_DEPS+=("$pkg")
-              fi
+          # Create list of required packages
+          REQUIRED_PACKAGES=(
+            "react@18"
+            "react-dom@18"
+            "vite"
+            "sonner"
+            "@vitejs/plugin-react"
+          )
+
+          for pkg in "${REQUIRED_PACKAGES[@]}"; do
+            if npm list "$pkg" --depth=0 2>&1 | grep -q "$pkg"; then
+              echo "✅ $pkg: installed"
+            else
+              echo "❌ $pkg: MISSING - installing..."
+              npm install "$pkg" --legacy-peer-deps --save
             fi
           done
 
-          # Install missing dependencies if any
-          if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
-            echo "📦 Installing missing dependencies: ${MISSING_DEPS[*]}"
-            npm install "${MISSING_DEPS[@]}" --legacy-peer-deps
-          fi
+          echo "📋 Full dependency tree:"
+          npm list --depth=0
 
-          echo "✅ Dependency check complete"
-
-      # ============ CLIENT BUILD ============
       - name: Build Client
         working-directory: Client
+        env:
+          VITE_API_URL: ""
+          NODE_ENV: "production"
+          NODE_OPTIONS: ${{ env.NODE_OPTIONS }}
         run: |
-          export VITE_API_URL=""
-          export NODE_OPTIONS="${{ env.NODE_OPTIONS }}"
-
           echo "🏗️ Building client application..."
-          echo "📋 Verifying sonner installation..."
-          npm list sonner react react-dom || exit 1
 
-          # Clear build cache to ensure clean ESM resolution
+          # Remove build cache
           rm -rf .vite dist
 
-          # Build with detailed error output
-          npm run build
+          # Build with verbose output
+          npm run build 2>&1 | tee build.log
+          BUILD_STATUS=${PIPESTATUS[0]}
 
-          if [ ! -d "dist" ] || [ -z "$(ls -A dist 2>/dev/null)" ]; then
-            echo "❌ Build failed: dist folder is empty"
+          # Check if build succeeded
+          if [ $BUILD_STATUS -ne 0 ]; then
+            echo "❌ Build failed with status $BUILD_STATUS"
+            echo "📋 Last 50 lines of build log:"
+            tail -50 build.log
             exit 1
           fi
 
-          echo "✅ Client build successful: $(du -sh dist | cut -f1)"
+          # Verify dist folder
+          if [ ! -d "dist" ] || [ -z "$(ls -A dist 2>/dev/null)" ]; then
+            echo "❌ Build failed: dist folder is empty or missing"
+            exit 1
+          fi
+
+          DIST_SIZE=$(du -sh dist | cut -f1)
+          FILE_COUNT=$(find dist -type f | wc -l)
+          echo "✅ Build successful!"
+          echo "📊 Dist size: $DIST_SIZE"
+          echo "📋 Files created: $FILE_COUNT"
 
       # ============ SERVER VALIDATION ============
-      - name: Validate Server
+      - name: Validate Server Configuration
         working-directory: Server
         run: |
-          echo "🔍 Validating server configuration..."
+          echo "🔍 Validating server setup..."
 
           if [ ! -f "package.json" ]; then
             echo "❌ Server/package.json not found"
             exit 1
           fi
 
-          ENTRY_POINT=""
+          # Find entry point
           if [ -f "server.js" ]; then
             ENTRY_POINT="server.js"
           elif [ -f "index.js" ]; then
             ENTRY_POINT="index.js"
           elif [ -f "app.js" ]; then
             ENTRY_POINT="app.js"
-          fi
-
-          if [ -z "$ENTRY_POINT" ]; then
-            echo "❌ No entry point found (server.js, index.js, or app.js)"
+          else
+            echo "❌ No entry point found"
             exit 1
           fi
 
-          echo "✅ Entry point found: $ENTRY_POINT"
+          echo "✅ Server entry point: $ENTRY_POINT"
+
+          # Validate key dependencies exist
+          if grep -q '"express"' package.json || grep -q '"cors"' package.json; then
+            echo "✅ Server dependencies defined"
+          fi
 
       # ============ PREPARE ARTIFACTS ============
-      - name: Prepare Deployment Artifacts
+      - name: Prepare Deployment Package
         run: |
           set -e
-          echo "📦 Preparing deployment artifacts..."
+          echo "📦 Preparing deployment package..."
 
+          rm -rf deploy_artifact
           mkdir -p deploy_artifact/{Client,Server,scripts}
 
-          # Copy Server
-          echo "📋 Copying Server..."
+          # Copy Server (exclude node_modules and sensitive files)
+          echo "📋 Packaging Server..."
           rsync -av --delete \
             --exclude='node_modules' \
             --exclude='logs' \
             --exclude='uploads' \
+            --exclude='*.log' \
             --exclude='.env' \
             --exclude='.env.*' \
             --exclude='.git' \
             --exclude='.gitignore' \
             --exclude='tmp' \
-            --exclude='dist' \
             --exclude='coverage' \
+            --exclude='.DS_Store' \
             Server/ deploy_artifact/Server/
 
-          # Copy Scripts
+          # Copy Client build
+          echo "📋 Packaging Client build..."
+          rsync -av --delete Client/dist/ deploy_artifact/Client/dist/
+          touch deploy_artifact/.client_updated
+
+          # Copy deployment scripts
           if [ -d "scripts" ]; then
-            echo "📋 Copying scripts..."
+            echo "📋 Packaging scripts..."
             rsync -av scripts/ deploy_artifact/scripts/
             chmod +x deploy_artifact/scripts/*.sh 2>/dev/null || true
           fi
 
-          # Copy Client build
-          echo "📋 Copying Client build..."
-          rsync -av --delete Client/dist/ deploy_artifact/Client/dist/
-          touch deploy_artifact/.client_updated
-
           # Create manifest
-          echo "✅ Build: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" > deploy_artifact/MANIFEST.txt
-          echo "Commit: $(git rev-parse --short HEAD)" >> deploy_artifact/MANIFEST.txt
+          {
+            echo "Build Time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+            echo "Commit: $(git rev-parse --short HEAD)"
+            echo "Branch: $(git rev-parse --abbrev-ref HEAD)"
+            echo "Node Version: ${{ env.NODE_VERSION }}"
+          } > deploy_artifact/MANIFEST.txt
 
-          echo "📊 Artifact size: $(du -sh deploy_artifact | cut -f1)"
+          TOTAL_SIZE=$(du -sh deploy_artifact | cut -f1)
+          echo "✅ Package prepared: $TOTAL_SIZE"
 
-      - name: Compress Artifacts
+      - name: Compress Deployment Package
         run: |
-          echo "📦 Compressing artifacts..."
-          tar -czf deploy_artifact.tar.gz -C deploy_artifact .
+          echo "📦 Compressing package..."
+          tar -czf deploy_artifact.tar.gz -C . deploy_artifact
 
           SIZE=$(ls -lh deploy_artifact.tar.gz | awk '{print $5}')
-          echo "✅ Compressed size: $SIZE"
+          echo "✅ Archive created: $SIZE"
 
-          # Verify integrity
-          tar -tzf deploy_artifact.tar.gz > /dev/null
-          echo "✅ Archive integrity verified"
+          # Verify archive
+          tar -tzf deploy_artifact.tar.gz > /dev/null && echo "✅ Archive integrity verified"
 
       # ============ TRANSFER TO EC2 ============
-      - name: Transfer Artifact to EC2
+      - name: Transfer to EC2
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -265,87 +235,144 @@ jobs:
 
             ARCHIVE="/home/ubuntu/deploy_artifact.tar.gz"
 
-            echo "🚀 Starting deployment..."
+            echo "🚀 Starting deployment process..."
 
-            # Cleanup
-            echo "🧹 Cleaning up..."
+            # Pre-deployment cleanup
+            echo "🧹 Cleaning deployment directory..."
             rm -rf "${{ env.TEMP_DIR }}"
             mkdir -p "${{ env.TEMP_DIR }}"
 
-            # Extract
+            # Extract artifacts
             echo "📦 Extracting artifacts..."
             tar -xzf "$ARCHIVE" -C "${{ env.TEMP_DIR }}"
             rm "$ARCHIVE"
 
-            # Ensure directories
-            mkdir -p "${{ env.APP_DIR }}/Client/dist"
-            mkdir -p "${{ env.APP_DIR }}/Server"
-            mkdir -p "${{ env.APP_DIR }}/scripts"
+            # Create app directories
+            mkdir -p "${{ env.APP_DIR }}"/{Client/dist,Server,scripts,logs}
 
-            # Update Client
-            if [ -f "${{ env.TEMP_DIR }}/.client_updated" ]; then
-              echo "📋 Updating client build..."
-              rsync -av --delete "${{ env.TEMP_DIR }}/Client/dist/" "${{ env.APP_DIR }}/Client/dist/"
-              echo "✅ Client updated"
+            # Deploy client build
+            if [ -f "${{ env.TEMP_DIR }}/deploy_artifact/.client_updated" ]; then
+              echo "📋 Deploying client build..."
+              rsync -av --delete "${{ env.TEMP_DIR }}/deploy_artifact/Client/dist/" "${{ env.APP_DIR }}/Client/dist/"
+              rm "${{ env.APP_DIR }}/Client/dist/.gitkeep" 2>/dev/null || true
+              echo "✅ Client deployed"
             fi
 
-            # Update Server Code
-            echo "📋 Updating server code..."
-            rsync -av "${{ env.TEMP_DIR }}/Server/" "${{ env.APP_DIR }}/Server/"
+            # Deploy server
+            echo "📋 Deploying server code..."
+            rsync -av "${{ env.TEMP_DIR }}/deploy_artifact/Server/" "${{ env.APP_DIR }}/Server/"
 
-            # Update Scripts
-            if [ -d "${{ env.TEMP_DIR }}/scripts" ]; then
-              rsync -av "${{ env.TEMP_DIR }}/scripts/" "${{ env.APP_DIR }}/scripts/"
+            # Deploy scripts
+            if [ -d "${{ env.TEMP_DIR }}/deploy_artifact/scripts" ]; then
+              rsync -av "${{ env.TEMP_DIR }}/deploy_artifact/scripts/" "${{ env.APP_DIR }}/scripts/"
               chmod +x "${{ env.APP_DIR }}/scripts/"*.sh 2>/dev/null || true
             fi
+
+            # Copy manifest
+            cp "${{ env.TEMP_DIR }}/deploy_artifact/MANIFEST.txt" "${{ env.APP_DIR }}/MANIFEST.txt"
 
             # Cleanup temp
             rm -rf "${{ env.TEMP_DIR }}"
 
-            # Setup Server
+            # ===== SERVER DEPLOYMENT =====
             cd "${{ env.APP_DIR }}/Server"
 
-            echo "🔧 Configuring server..."
+            echo "🔧 Setting up server..."
+
+            # Create .env if missing
             if [ ! -f ".env" ]; then
               echo "PORT=4000" > .env
               echo "NODE_ENV=production" >> .env
             fi
 
-            # Install/Update Dependencies
+            # Install/update server dependencies
             echo "📦 Installing server dependencies..."
-            npm config set legacy-peer-deps=true --legacy-peer-deps
-            npm install --production --no-audit --prefer-offline --legacy-peer-deps 2>&1 | grep -E "(added|up to date)" || true
+            npm config set legacy-peer-deps=true
+            npm ci --production --no-audit --prefer-offline --legacy-peer-deps 2>&1 | tail -20 || true
 
             if [ ! -d "node_modules" ]; then
               echo "❌ Server dependencies installation failed"
               exit 1
             fi
 
-            # Start Server
-            echo "🔄 Starting server..."
-            if command -v pm2 &> /dev/null; then
-              pm2 restart communiatec-server --update-env 2>/dev/null || pm2 start server.js --name "communiatec-server" --env NODE_ENV=production
-            else
+            echo "✅ Server ready"
+
+            # ===== PM2 MANAGEMENT =====
+            echo "🔄 Configuring PM2..."
+
+            if ! command -v pm2 &> /dev/null; then
               npm install -g pm2
-              pm2 start server.js --name "communiatec-server" --env NODE_ENV=production
             fi
 
-            # Verify Server is Running
+            # Stop existing process if running
+            pm2 stop communiatec-server 2>/dev/null || true
+
+            # Start server with PM2
+            pm2 start server.js \
+              --name "communiatec-server" \
+              --env NODE_ENV=production \
+              --max-memory-restart 500M \
+              --error "${{ env.APP_DIR }}/logs/server-error.log" \
+              --output "${{ env.APP_DIR }}/logs/server-out.log"
+
+            pm2 save
+
+            # Verify server status
             sleep 3
+            if pm2 list | grep -q "communiatec-server.*online"; then
+              echo "✅ Server started successfully"
+              pm2 info communiatec-server | head -15
+            else
+              echo "⚠️ Server may not be running, checking logs..."
+              pm2 logs communiatec-server --lines 30
+              exit 1
+            fi
+
+            # ===== NGINX RESTART =====
+            echo "🔄 Restarting Nginx..."
+            sudo systemctl restart nginx 2>/dev/null || sudo service nginx restart || true
+
+            echo "✅ Deployment completed successfully!"
+
+            # Show final status
+            echo "📊 Final Status:"
+            echo "- Server: $(pm2 list | grep communiatec-server | awk '{print $10}')"
+            echo "- Client dist size: $(du -sh ${{ env.APP_DIR }}/Client/dist | cut -f1)"
+            echo "- Manifest: $(cat ${{ env.APP_DIR }}/MANIFEST.txt | head -1)"
+
+      - name: Deployment Verification
+        uses: appleboy/ssh-action@master
+        if: always()
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: "10m"
+          script: |
+            echo "🔍 Verifying deployment..."
+
+            # Check server process
             if pm2 list | grep -q "communiatec-server.*online"; then
               echo "✅ Server is running"
             else
-              echo "⚠️ Server may not be running, checking logs..."
-              pm2 logs communiatec-server --lines 20
+              echo "❌ Server is not running"
             fi
 
-            # Restart Nginx
-            echo "🔄 Restarting nginx..."
-            sudo systemctl restart nginx || sudo service nginx restart
+            # Check client build
+            if [ -d "${{ env.APP_DIR }}/Client/dist" ] && [ -n "$(ls -A ${{ env.APP_DIR }}/Client/dist)" ]; then
+              echo "✅ Client build deployed"
+            else
+              echo "❌ Client build missing or empty"
+            fi
 
-            echo "✅ Deployment complete!"
+            # Check recent errors
+            if [ -f "${{ env.APP_DIR }}/logs/server-error.log" ]; then
+              ERRORS=$(wc -l < "${{ env.APP_DIR }}/logs/server-error.log")
+              echo "⚠️ Server error log entries: $ERRORS"
+            fi
 
-      - name: Deployment Status
+      - name: Workflow Complete
         if: always()
         run: |
-          echo "🎉 Workflow completed"
+          echo "🎉 Deployment workflow completed!"
+          echo "Check EC2 instance for application status"
