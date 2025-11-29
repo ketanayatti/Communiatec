@@ -18,8 +18,7 @@ export default defineConfig({
         "apple-touch-icon.png",
       ],
       workbox: {
-        // Raise precache limit to stop the build error
-        maximumFileSizeToCacheInBytes: 8_000_000, // ~8 MB
+        maximumFileSizeToCacheInBytes: 8_000_000,
         cleanupOutdatedCaches: true,
         skipWaiting: true,
         clientsClaim: true,
@@ -45,7 +44,6 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      // Force single React copy to avoid duplicate-react issues in bundles
       react: path.resolve(__dirname, "./node_modules/react"),
       "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
     },
@@ -57,23 +55,43 @@ export default defineConfig({
     ],
   },
   build: {
-    // Never show the large chunk warning again
     chunkSizeWarningLimit: 1600,
-    sourcemap: false, // Disable sourcemaps for production to save memory/time
-    target: "es2015", // Modern browsers
+    sourcemap: true, // ✅ FIXED: Enable source maps for debugging
+    target: "es2015",
     commonjsOptions: {
       include: [/node_modules/],
     },
     rollupOptions: {
       output: {
-        // Optimized chunk splitting
         manualChunks(id) {
           if (id.includes("node_modules")) {
-            // 1. Monaco Editor (Huge)
+            // ✅ FIXED: SINGLE React+UI+Utils chunk prevents cycles
+            if (
+              id.includes("react") ||
+              id.includes("react-dom") ||
+              id.includes("react-router") ||
+              id.includes("zustand") ||
+              id.includes("prop-types") ||
+              id.includes("@radix-ui") ||
+              id.includes("lucide-react") ||
+              id.includes("react-icons") ||
+              id.includes("@heroicons") ||
+              id.includes("framer-motion") ||
+              id.includes("clsx") ||
+              id.includes("tailwind-merge") ||
+              id.includes("socket.io-client") || // ✅ FIXED: Moved here
+              id.includes("axios") ||
+              id.includes("date-fns") ||
+              id.includes("moment") ||
+              id.includes("uuid")
+            ) {
+              return "vendor_react";
+            }
+
+            // Isolated heavy deps
             if (id.includes("monaco-editor") || id.includes("@monaco-editor")) {
               return "vendor_monaco";
             }
-            // 2. 3D / Visualization
             if (
               id.includes("three") ||
               id.includes("@react-three") ||
@@ -81,43 +99,7 @@ export default defineConfig({
             ) {
               return "vendor_three";
             }
-            // 3. React Ecosystem (Core)
-            if (
-              id.includes("react") ||
-              id.includes("react-dom") ||
-              id.includes("react-router") ||
-              id.includes("zustand") ||
-              id.includes("prop-types")
-            ) {
-              return "vendor_react";
-            }
-            // 4. UI Components & Icons
-            if (
-              id.includes("@radix-ui") ||
-              id.includes("lucide-react") ||
-              id.includes("react-icons") ||
-              id.includes("@heroicons") ||
-              id.includes("framer-motion") ||
-              id.includes("clsx") ||
-              id.includes("tailwind-merge")
-            ) {
-              // Put UI libs in the React vendor chunk to avoid circular
-              // inter-chunk imports that can make the React binding undefined
-              // at runtime. This keeps React and dependent UI libs together.
-              return "vendor_react";
-            }
-            // 5. Utilities
-            if (
-              id.includes("axios") ||
-              id.includes("date-fns") ||
-              id.includes("moment") ||
-              id.includes("socket.io-client") ||
-              id.includes("uuid")
-            ) {
-              return "vendor_utils";
-            }
 
-            // Default vendor chunk for everything else
             return "vendor_libs";
           }
         },
@@ -126,7 +108,6 @@ export default defineConfig({
   },
   optimizeDeps: {
     force: true,
-    include: ["react", "react-dom", "react/jsx-runtime"],
-    exclude: [],
+    include: ["react", "react-dom", "react/jsx-runtime", "socket.io-client"],
   },
 });
