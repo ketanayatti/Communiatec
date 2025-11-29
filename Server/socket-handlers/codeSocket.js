@@ -149,7 +149,18 @@ const handleCodeCollaboration = (io) => {
     socket.on("code-change", async (data) => {
       const { sessionId, code, changes, userId, timestamp } = data;
 
-      // console.log(`📝 Code change from user ${userId} in session ${sessionId}`);
+      // Log receipt of incoming code-change for debugging
+      try {
+        console.log("👂 Received code-change from client", {
+          fromSocket: socket.id,
+          sessionId,
+          userId,
+          codeLength: code ? code.length : 0,
+          timestamp,
+        });
+      } catch (err) {
+        console.warn("⚠️ Error logging code-change payload", err);
+      }
 
       try {
         // Verify user is in this session
@@ -213,9 +224,29 @@ const handleCodeCollaboration = (io) => {
           timestamp: timestamp || Date.now(),
         };
 
-        // Use the namespace to broadcast
+        // Use the namespace to broadcast to other users in the room
         socket.to(sessionId).emit("code-update", updateData);
-        // console.log(`📡 Broadcasted code update to other users in room ${sessionId}`);
+
+        // Log how many sockets are in the room after broadcast
+        try {
+          const socketsInRoom = await codeNamespace.in(sessionId).fetchSockets();
+          console.log(
+            `📡 Broadcasted code update to room ${sessionId} (room size: ${socketsInRoom.length})`
+          );
+        } catch (err) {
+          console.warn("⚠️ Failed to fetch room sockets for logging", err);
+        }
+
+        // Acknowledge to the sender that the server processed the change
+        try {
+          socket.emit("code-ack", {
+            sessionId,
+            timestamp: Date.now(),
+            success: true,
+          });
+        } catch (err) {
+          console.warn("⚠️ Failed to emit code-ack to sender", err);
+        }
       } catch (error) {
         console.error("❌ Code change error:", error);
         socket.emit("error", {

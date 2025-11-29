@@ -139,11 +139,11 @@ const MaintenanceScreen = () => {
         {/* Main message */}
         <motion.div variants={itemVariants} className="mb-8">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-            We're Making Things Better
+            We&apos;re Making Things Better
           </h2>
           <p className="text-xl text-gray-300 mb-6 leading-relaxed">
             Communiatec is currently undergoing scheduled maintenance to improve
-            your experience. We'll be back online shortly.
+            your experience. We&apos;ll be back online shortly.
           </p>
         </motion.div>
 
@@ -189,10 +189,6 @@ const MaintenanceScreen = () => {
             <RefreshCw className="w-5 h-5 mr-2" />
             Check Again
           </Button>
-
-          <p className="text-sm text-gray-400">
-            Follow us on social media for real-time updates
-          </p>
         </motion.div>
 
         {/* Footer message */}
@@ -201,8 +197,8 @@ const MaintenanceScreen = () => {
           className="mt-12 pt-8 border-t border-white/10"
         >
           <p className="text-gray-400 text-sm">
-            Thank you for your patience. We're working hard to get back online
-            as quickly as possible.
+            Thank you for your patience. We&apos;re working hard to get back
+            online as quickly as possible.
           </p>
         </motion.div>
       </motion.div>

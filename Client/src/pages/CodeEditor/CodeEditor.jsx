@@ -59,6 +59,7 @@ const CodeEditor = () => {
   // Refs for managing updates
   const lastRemoteUpdate = useRef(0);
   const isUpdatingFromRemote = useRef(false);
+  const sessionJoinedRef = useRef(false);
   const typingTimeoutRef = useRef(null);
 
   // Initialize code collaboration socket
@@ -75,6 +76,7 @@ const CodeEditor = () => {
       return () => {
         console.log("🧹 Cleaning up code socket...");
         disconnectCodeSocket();
+        sessionJoinedRef.current = false;
         setCodeSocket(null);
       };
     }
@@ -94,6 +96,9 @@ const CodeEditor = () => {
       setTimeout(() => {
         isUpdatingFromRemote.current = false;
       }, 500);
+
+      // Mark that we've successfully joined the session room on server
+      sessionJoinedRef.current = true;
 
       toast.success("Successfully joined collaboration session!");
     });
@@ -170,6 +175,11 @@ const CodeEditor = () => {
     socket.on("pong", (data) => {
       console.log("🏓 Code socket health check OK", data);
     });
+
+    // Server acknowledgement for debug
+    socket.on("code-ack", (ack) => {
+      console.log("📨 Server acknowledged code-change:", ack);
+    });
   };
 
   // Load session data
@@ -236,6 +246,12 @@ const CodeEditor = () => {
     // Check if this is too close to a recent remote update
     if (timestamp && timestamp <= lastRemoteUpdate.current + 500) {
       console.log("⏭️ Skipping local change (too close to remote update)");
+      return;
+    }
+
+    // Ensure we've joined the session room on the server before emitting
+    if (!sessionJoinedRef.current) {
+      console.warn("⚠️ Not joined to session yet - skipping emit");
       return;
     }
 
