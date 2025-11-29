@@ -48,14 +48,26 @@ jobs:
           npm config set fetch-retry-maxtimeout=120000
           npm config set audit=false
 
+      - name: Generate Lock File
+        working-directory: Client
+        run: |
+          echo "🔐 Generating package-lock.json..."
+          npm install --package-lock-only --legacy-peer-deps --prefer-offline --no-audit
+
+          if [ ! -f "package-lock.json" ]; then
+            echo "❌ Failed to generate package-lock.json"
+            exit 1
+          fi
+          echo "✅ Lock file generated"
+
       - name: Install Client Dependencies
         working-directory: Client
         run: |
           echo "📦 Installing client dependencies..."
           npm ci --legacy-peer-deps --prefer-offline --no-audit
 
-          if [ ! -f "package-lock.json" ]; then
-            echo "❌ package-lock.json not generated"
+          if [ ! -d "node_modules" ]; then
+            echo "❌ Dependencies installation failed"
             exit 1
           fi
           echo "✅ Dependencies installed successfully"
