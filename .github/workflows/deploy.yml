@@ -99,16 +99,33 @@ jobs:
 
           echo "✅ Dependencies installed successfully"
 
-      - name: Validate Client Dependencies
+      - name: Validate & Fix Missing Dependencies
         working-directory: Client
         run: |
-          echo "🔍 Validating dependencies..."
-          npm list react 2>/dev/null | head -20 || true
+          echo "🔍 Checking for missing dependencies..."
 
-          echo "🧪 Running npm audit..."
-          npm audit --audit-level=moderate 2>/dev/null || true
+          # Get list of imports from source files
+          MISSING_DEPS=()
 
-          echo "✅ Validation complete"
+          # Check for commonly problematic packages
+          CRITICAL_PACKAGES=("monaco-editor" "three" "@monaco-editor/react")
+
+          for pkg in "${CRITICAL_PACKAGES[@]}"; do
+            if grep -r "from ['\"]$pkg['\"]" src/ 2>/dev/null | grep -q .; then
+              if ! npm list "$pkg" 2>/dev/null | grep -q "$pkg@"; then
+                echo "⚠️ Missing: $pkg"
+                MISSING_DEPS+=("$pkg")
+              fi
+            fi
+          done
+
+          # Install missing dependencies if any
+          if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
+            echo "📦 Installing missing dependencies: ${MISSING_DEPS[*]}"
+            npm install "${MISSING_DEPS[@]}" --legacy-peer-deps
+          fi
+
+          echo "✅ Dependency check complete"
 
       # ============ CLIENT BUILD ============
       - name: Build Client
@@ -118,15 +135,37 @@ jobs:
           export NODE_OPTIONS="${{ env.NODE_OPTIONS }}"
 
           echo "🏗️ Building client application..."
-          npm run build
+
+          # First attempt
+          if npm run build; then
+            echo "✅ Build succeeded on first attempt"
+          else
+            echo "⚠️ Build failed, attempting recovery..."
+            
+            # Clear vite cache
+            echo "🧹 Clearing cache..."
+            rm -rf .vite node_modules/.vite
+            
+            # Try installing all optional dependencies
+            echo "📦 Installing optional dependencies..."
+            npm install --save-optional --legacy-peer-deps 2>&1 | tail -5 || true
+            
+            # Retry build
+            echo "🔁 Retrying build..."
+            if npm run build; then
+              echo "✅ Build succeeded after recovery"
+            else
+              echo "❌ Build failed after recovery"
+              exit 1
+            fi
+          fi
 
           if [ ! -d "dist" ] || [ -z "$(ls -A dist 2>/dev/null)" ]; then
             echo "❌ Build failed: dist folder is empty"
             exit 1
           fi
 
-          echo "✅ Client build successful"
-          du -sh dist
+          echo "✅ Client build successful: $(du -sh dist | cut -f1)"
 
       # ============ SERVER VALIDATION ============
       - name: Validate Server
