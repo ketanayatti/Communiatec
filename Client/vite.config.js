@@ -8,7 +8,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   plugins: [
-    react(),
+    react({
+      jsxRuntime: "automatic",
+    }),
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: [
