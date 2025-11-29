@@ -66,13 +66,13 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes("node_modules")) {
-            // ✅ FIXED: Added sonner to React+UI chunk
+            // React and UI libraries chunk
             if (
               id.includes("react") ||
               id.includes("react-dom") ||
               id.includes("react-router") ||
               id.includes("zustand") ||
-              id.includes("use-sync-external-store") || // ✅ ADDED
+              id.includes("use-sync-external-store") ||
               id.includes("prop-types") ||
               id.includes("@radix-ui") ||
               id.includes("lucide-react") ||
@@ -82,7 +82,7 @@ export default defineConfig({
               id.includes("clsx") ||
               id.includes("tailwind-merge") ||
               id.includes("socket.io-client") ||
-              id.includes("sonner") || // ✅ ADDED: Bundle sonner with React deps
+              id.includes("sonner") ||
               id.includes("axios") ||
               id.includes("date-fns") ||
               id.includes("moment") ||
@@ -91,10 +91,12 @@ export default defineConfig({
               return "vendor_react";
             }
 
-            // Isolated heavy deps
+            // Monaco Editor - separate chunk due to size
             if (id.includes("monaco-editor") || id.includes("@monaco-editor")) {
               return "vendor_monaco";
             }
+
+            // Three.js and 3D libraries
             if (
               id.includes("three") ||
               id.includes("@react-three") ||
@@ -103,6 +105,7 @@ export default defineConfig({
               return "vendor_three";
             }
 
+            // All other node_modules
             return "vendor_libs";
           }
         },
@@ -118,6 +121,8 @@ export default defineConfig({
       "sonner",
       "use-sync-external-store",
       "zustand",
+      "monaco-editor",
     ],
+    exclude: [],
   },
 });

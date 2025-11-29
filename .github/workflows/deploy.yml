@@ -84,6 +84,7 @@ jobs:
             "vite"
             "sonner"
             "@vitejs/plugin-react"
+            "monaco-editor"
           )
 
           for pkg in "${REQUIRED_PACKAGES[@]}"; do
