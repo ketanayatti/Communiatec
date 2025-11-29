@@ -161,10 +161,14 @@ jobs:
             # 5. Restart
             echo "🔄 Restarting Server..."
             if command -v pm2 &> /dev/null; then
-                pm2 restart communiatec-server --update-env || pm2 start server.js --name "communiatec-server" --env NODE_ENV=production
+              pm2 restart communiatec-server --update-env || pm2 start server.js --name "communiatec-server" --env NODE_ENV=production
             else
-                npm install -g pm2
-                pm2 start server.js --name "communiatec-server" --env NODE_ENV=production
+              npm install -g pm2
+              pm2 start server.js --name "communiatec-server" --env NODE_ENV=production
             fi
+
+            # Restart nginx to serve new client build
+            echo "🔄 Restarting nginx to serve updated client build..."
+            sudo systemctl restart nginx || sudo service nginx restart
 
             echo "✅ Deployment Complete!"
