@@ -143,7 +143,7 @@ const MaintenanceScreen = () => {
           </h2>
           <p className="text-xl text-gray-300 mb-6 leading-relaxed">
             Communiatec is currently undergoing scheduled maintenance to improve
-            your experience. We&apos;ll be back online shortly.
+            your experience. Well be back online shortly.
           </p>
         </motion.div>
 
@@ -197,8 +197,8 @@ const MaintenanceScreen = () => {
           className="mt-12 pt-8 border-t border-white/10"
         >
           <p className="text-gray-400 text-sm">
-            Thank you for your patience. We&apos;re working hard to get back
-            online as quickly as possible.
+            Thank you for your patience. Were working hard to get back online as
+            quickly as possible.
           </p>
         </motion.div>
       </motion.div>
