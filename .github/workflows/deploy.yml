@@ -82,6 +82,8 @@ jobs:
         run: |
           echo "🧹 Cleaning previous installations..."
           rm -rf node_modules package-lock.json npm-shrinkwrap.json .npmrc
+          rm -rf .vite dist
+          rm -rf .next  # if using Next.js
 
           echo "🔧 Configuring npm..."
           npm config set legacy-peer-deps=true --legacy-peer-deps
@@ -107,8 +109,8 @@ jobs:
           # Get list of imports from source files
           MISSING_DEPS=()
 
-          # Check for commonly problematic packages
-          CRITICAL_PACKAGES=("monaco-editor" "three" "@monaco-editor/react")
+          # Check for commonly problematic packages (including sonner)
+          CRITICAL_PACKAGES=("monaco-editor" "three" "@monaco-editor/react" "sonner")
 
           for pkg in "${CRITICAL_PACKAGES[@]}"; do
             if grep -r "from ['\"]$pkg['\"]" src/ 2>/dev/null | grep -q .; then
@@ -142,13 +144,18 @@ jobs:
           else
             echo "⚠️ Build failed, attempting recovery..."
             
-            # Clear vite cache
-            echo "🧹 Clearing cache..."
-            rm -rf .vite node_modules/.vite
+            # Clear all Vite and build caches
+            echo "🧹 Clearing all caches..."
+            rm -rf .vite node_modules/.vite node_modules/.cache
+            rm -rf dist
             
-            # Try installing all optional dependencies
+            # Try installing optional dependencies
             echo "📦 Installing optional dependencies..."
             npm install --save-optional --legacy-peer-deps 2>&1 | tail -5 || true
+            
+            # Force rebuild of problematic packages
+            echo "🔨 Force rebuilding sonner and related packages..."
+            npm rebuild sonner 2>&1 | grep -v "^gyp ERR" || true
             
             # Retry build
             echo "🔁 Retrying build..."
