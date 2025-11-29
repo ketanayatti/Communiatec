@@ -22,21 +22,8 @@ jobs:
           cache: "npm"
           cache-dependency-path: "**/package-lock.json"
 
-      - name: Check for Client Changes
-        id: changes
-        run: |
-          # Check if Client files changed in the last commit
-          if git diff --name-only HEAD^ HEAD | grep -q "Client/"; then
-            echo "client_changed=true" >> $GITHUB_OUTPUT
-            echo "📝 Client files changed - Build required."
-          else
-            echo "client_changed=false" >> $GITHUB_OUTPUT
-            echo "⏩ No Client changes - Skipping build."
-          fi
-
-      # 1. Cache & Install (Only if Client changed)
+      # 1. Cache & Install Client Dependencies
       - name: Cache Client Dependencies
-        if: steps.changes.outputs.client_changed == 'true'
         id: client-cache
         uses: actions/cache@v3
         with:
@@ -44,14 +31,13 @@ jobs:
           key: ${{ runner.os }}-client-${{ hashFiles('Client/package-lock.json') }}
 
       - name: Install Client Dependencies
-        if: steps.changes.outputs.client_changed == 'true' && steps.client-cache.outputs.cache-hit != 'true'
+        if: steps.client-cache.outputs.cache-hit != 'true'
         run: |
           cd Client
           npm ci --prefer-offline --no-audit
 
-      # 2. Build Client (Only if Client changed)
+      # 2. Build Client (Always)
       - name: Build Client
-        if: steps.changes.outputs.client_changed == 'true'
         run: |
           cd Client
           export VITE_API_URL=""
@@ -76,15 +62,11 @@ jobs:
           # Copy Scripts
           cp -r scripts deploy_artifact/
 
-          # Copy Client Build (Only if built)
-          if [ "${{ steps.changes.outputs.client_changed }}" == "true" ]; then
-            echo "📦 Including new Client build..."
-            mkdir -p deploy_artifact/Client
-            cp -r Client/dist deploy_artifact/Client/
-            touch deploy_artifact/.client_updated
-          else
-            echo "⏩ Skipping Client build inclusion."
-          fi
+          # Always include Client build
+          echo "📦 Including Client build..."
+          mkdir -p deploy_artifact/Client
+          cp -r Client/dist deploy_artifact/Client/
+          touch deploy_artifact/.client_updated
 
           echo "📊 Artifact Size:"
           du -sh deploy_artifact/
