@@ -101,7 +101,10 @@ export default defineConfig({
               id.includes("clsx") ||
               id.includes("tailwind-merge")
             ) {
-              return "vendor_ui";
+              // Put UI libs in the React vendor chunk to avoid circular
+              // inter-chunk imports that can make the React binding undefined
+              // at runtime. This keeps React and dependent UI libs together.
+              return "vendor_react";
             }
             // 5. Utilities
             if (
