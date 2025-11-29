@@ -14,7 +14,8 @@ const getBaseUrl = () => {
   if (typeof window !== "undefined") {
     const protocol = window.location.protocol;
     const hostname = window.location.hostname;
-    return `${protocol}//${hostname}:4000`;
+    const port = window.location.port ? `:${window.location.port}` : "";
+    return `${protocol}//${hostname}${port}`;
   }
   // Fallback
   return "http://localhost:4000";
