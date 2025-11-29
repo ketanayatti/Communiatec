@@ -52,11 +52,12 @@ export default defineConfig({
       "react-dom",
       "@radix-ui/react-slot",
       "@radix-ui/react-primitive",
+      "sonner", // ✅ ADDED: Fix sonner ESM issue
     ],
   },
   build: {
     chunkSizeWarningLimit: 1600,
-    sourcemap: true, // ✅ FIXED: Enable source maps for debugging
+    sourcemap: true,
     target: "es2015",
     commonjsOptions: {
       include: [/node_modules/],
@@ -65,7 +66,7 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes("node_modules")) {
-            // ✅ FIXED: SINGLE React+UI+Utils chunk prevents cycles
+            // ✅ FIXED: Added sonner to React+UI chunk
             if (
               id.includes("react") ||
               id.includes("react-dom") ||
@@ -79,7 +80,8 @@ export default defineConfig({
               id.includes("framer-motion") ||
               id.includes("clsx") ||
               id.includes("tailwind-merge") ||
-              id.includes("socket.io-client") || // ✅ FIXED: Moved here
+              id.includes("socket.io-client") ||
+              id.includes("sonner") || // ✅ ADDED: Bundle sonner with React deps
               id.includes("axios") ||
               id.includes("date-fns") ||
               id.includes("moment") ||
@@ -108,6 +110,12 @@ export default defineConfig({
   },
   optimizeDeps: {
     force: true,
-    include: ["react", "react-dom", "react/jsx-runtime", "socket.io-client"],
+    include: [
+      "react",
+      "react-dom",
+      "react/jsx-runtime",
+      "socket.io-client",
+      "sonner", // ✅ ADDED: Pre-bundle sonner to prevent ESM issues
+    ],
   },
 });
