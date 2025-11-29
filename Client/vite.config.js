@@ -44,8 +44,6 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      react: path.resolve(__dirname, "./node_modules/react"),
-      "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
     },
     dedupe: [
       "react",
@@ -53,8 +51,8 @@ export default defineConfig({
       "@radix-ui/react-slot",
       "@radix-ui/react-primitive",
       "sonner",
-      "use-sync-external-store", // ✅ ADDED: Fix React external store duplicate
-      "zustand", // ✅ ADDED: Prevent zustand duplication
+      "use-sync-external-store",
+      "zustand",
     ],
   },
   build: {
@@ -112,15 +110,14 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    force: true,
     include: [
       "react",
       "react-dom",
       "react/jsx-runtime",
       "socket.io-client",
       "sonner",
-      "use-sync-external-store", // ✅ ADDED: Pre-bundle to prevent duplication
-      "zustand", // ✅ ADDED: Pre-bundle state manager
+      "use-sync-external-store",
+      "zustand",
     ],
   },
 });
