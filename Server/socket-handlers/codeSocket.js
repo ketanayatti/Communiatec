@@ -229,7 +229,9 @@ const handleCodeCollaboration = (io) => {
 
         // Log how many sockets are in the room after broadcast
         try {
-          const socketsInRoom = await codeNamespace.in(sessionId).fetchSockets();
+          const socketsInRoom = await codeNamespace
+            .in(sessionId)
+            .fetchSockets();
           console.log(
             `📡 Broadcasted code update to room ${sessionId} (room size: ${socketsInRoom.length})`
           );
