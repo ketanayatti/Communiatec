@@ -66,6 +66,7 @@ if (allowedOrigins.length === 0) {
     "http://localhost:5174",
     "http://localhost:3000",
     "https://communiatec.vercel.app",
+    "http://3.226.122.22",
   ].filter(Boolean);
   allowedOrigins = Array.from(new Set(defaults));
 }

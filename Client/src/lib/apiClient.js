@@ -5,8 +5,22 @@ const getToken = () => {
   return localStorage.getItem("authToken");
 };
 
-// Use environment variable for API URL, fallback to production backend
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
+// Use environment variable for API URL, or dynamic determination based on window location
+const getBaseUrl = () => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  // If running in browser, determine based on current hostname
+  if (typeof window !== "undefined") {
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname;
+    return `${protocol}//${hostname}:4000`;
+  }
+  // Fallback
+  return "http://localhost:4000";
+};
+
+const API_BASE_URL = getBaseUrl();
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
