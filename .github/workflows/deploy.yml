@@ -94,6 +94,10 @@ jobs:
           echo "📦 Installing dependencies..."
           npm install --prefer-offline --no-audit --legacy-peer-deps
 
+          # Ensure sonner and react are properly installed
+          echo "🔨 Force installing sonner..."
+          npm install sonner@latest --save --legacy-peer-deps --force
+
           if [ ! -f "package-lock.json" ]; then
             echo "❌ package-lock.json not created"
             exit 1
@@ -137,35 +141,11 @@ jobs:
           export NODE_OPTIONS="${{ env.NODE_OPTIONS }}"
 
           echo "🏗️ Building client application..."
+          echo "📋 Verifying sonner installation..."
+          npm list sonner || npm install sonner@latest --legacy-peer-deps
 
-          # First attempt
-          if npm run build; then
-            echo "✅ Build succeeded on first attempt"
-          else
-            echo "⚠️ Build failed, attempting recovery..."
-            
-            # Clear all Vite and build caches
-            echo "🧹 Clearing all caches..."
-            rm -rf .vite node_modules/.vite node_modules/.cache
-            rm -rf dist
-            
-            # Try installing optional dependencies
-            echo "📦 Installing optional dependencies..."
-            npm install --save-optional --legacy-peer-deps 2>&1 | tail -5 || true
-            
-            # Force rebuild of problematic packages
-            echo "🔨 Force rebuilding sonner and related packages..."
-            npm rebuild sonner 2>&1 | grep -v "^gyp ERR" || true
-            
-            # Retry build
-            echo "🔁 Retrying build..."
-            if npm run build; then
-              echo "✅ Build succeeded after recovery"
-            else
-              echo "❌ Build failed after recovery"
-              exit 1
-            fi
-          fi
+          # Build with detailed error output
+          npm run build
 
           if [ ! -d "dist" ] || [ -z "$(ls -A dist 2>/dev/null)" ]; then
             echo "❌ Build failed: dist folder is empty"
