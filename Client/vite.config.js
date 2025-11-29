@@ -52,7 +52,9 @@ export default defineConfig({
       "react-dom",
       "@radix-ui/react-slot",
       "@radix-ui/react-primitive",
-      "sonner", // ✅ ADDED: Fix sonner ESM issue
+      "sonner",
+      "use-sync-external-store", // ✅ ADDED: Fix React external store duplicate
+      "zustand", // ✅ ADDED: Prevent zustand duplication
     ],
   },
   build: {
@@ -72,6 +74,7 @@ export default defineConfig({
               id.includes("react-dom") ||
               id.includes("react-router") ||
               id.includes("zustand") ||
+              id.includes("use-sync-external-store") || // ✅ ADDED
               id.includes("prop-types") ||
               id.includes("@radix-ui") ||
               id.includes("lucide-react") ||
@@ -115,7 +118,9 @@ export default defineConfig({
       "react-dom",
       "react/jsx-runtime",
       "socket.io-client",
-      "sonner", // ✅ ADDED: Pre-bundle sonner to prevent ESM issues
+      "sonner",
+      "use-sync-external-store", // ✅ ADDED: Pre-bundle to prevent duplication
+      "zustand", // ✅ ADDED: Pre-bundle state manager
     ],
   },
 });
