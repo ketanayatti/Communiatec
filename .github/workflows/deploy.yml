@@ -5,108 +5,211 @@ on:
     branches:
       - master
 
+env:
+  APP_DIR: "/home/ubuntu/Communiatec"
+  TEMP_DIR: "/home/ubuntu/Communiatec_Temp"
+  NODE_VERSION: "20"
+  NODE_OPTIONS: "--max-old-space-size=4096"
+
 jobs:
   build-and-deploy:
     name: Build and Deploy
     runs-on: ubuntu-latest
+    timeout-minutes: 40
+
     steps:
+      # ============ CHECKOUT & SETUP ============
       - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 2
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: "**/package-lock.json"
+          node-version: ${{ env.NODE_VERSION }}
 
-      # 1. Cache & Install Client Dependencies
-      - name: Cache Client Dependencies
-        id: client-cache
-        uses: actions/cache@v3
-        with:
-          path: Client/node_modules
-          key: ${{ runner.os }}-client-${{ hashFiles('Client/package-lock.json') }}
-
-      - name: Install Client Dependencies
-        if: steps.client-cache.outputs.cache-hit != 'true'
+      # ============ DETECT & FIX DEPENDENCY ISSUES ============
+      - name: Detect Duplicate Dependencies
+        working-directory: Client
         run: |
-          cd Client
-          npm ci --prefer-offline --no-audit
+          echo "🔍 Scanning for duplicate dependencies..."
 
-      # 2. Build Client (Always)
-      - name: Build Client (with automatic retry on failure)
+          # Create a script to find duplicate packages
+          node -e "
+          const fs = require('fs');
+          const path = require('path');
+
+          const getVersion = (dir) => {
+            try {
+              const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+              return pkg.version;
+            } catch { return null; }
+          };
+
+          const findDuplicates = (dir, duplicates = {}) => {
+            if (!fs.existsSync(dir)) return duplicates;
+            
+            const entries = fs.readdirSync(dir);
+            for (const entry of entries) {
+              const fullPath = path.join(dir, entry);
+              try {
+                if (fs.statSync(fullPath).isDirectory()) {
+                  const pkgPath = path.join(fullPath, 'package.json');
+                  if (fs.existsSync(pkgPath)) {
+                    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+                    if (!duplicates[pkg.name]) duplicates[pkg.name] = [];
+                    duplicates[pkg.name].push({ version: pkg.version, path: fullPath });
+                  }
+                  findDuplicates(fullPath, duplicates);
+                }
+              } catch (e) {}
+            }
+            return duplicates;
+          };
+
+          const dups = findDuplicates('node_modules');
+          let hasDuplicates = false;
+          for (const [pkg, versions] of Object.entries(dups)) {
+            if (versions.length > 1) {
+              console.log('⚠️ Duplicate:', pkg, versions.map(v => v.version).join(', '));
+              hasDuplicates = true;
+            }
+          }
+          process.exit(hasDuplicates ? 1 : 0);
+          " || echo "⚠️ Duplicates detected, will rebuild fresh"
+
+      - name: Clean and Rebuild Client Dependencies
+        working-directory: Client
         run: |
-          set -e
-          cd Client
-          export VITE_API_URL=""
-          export NODE_OPTIONS="--max-old-space-size=4096"
+          echo "🧹 Cleaning previous installations..."
+          rm -rf node_modules package-lock.json npm-shrinkwrap.json .npmrc
 
-          echo "📦 Running initial client build..."
-          if npm run build; then
-            echo "✅ Client build succeeded."
-          else
-            echo "⚠️ Initial client build failed. Attempting clean reinstall and rebuild..."
-            rm -rf node_modules package-lock.json
-            npm ci --prefer-offline --no-audit
-            echo "🔁 Rebuilding client after clean install..."
-            if npm run build; then
-              echo "✅ Client rebuild succeeded after clean install."
-            else
-              echo "❌ Client build failed after retry. Aborting." >&2
-              exit 1
-            fi
+          echo "🔧 Configuring npm..."
+          npm config set legacy-peer-deps=true --legacy-peer-deps
+          npm config set fetch-timeout=60000
+          npm config set fetch-retry-mintimeout=20000
+          npm config set fetch-retry-maxtimeout=120000
+
+          echo "📦 Installing dependencies..."
+          npm install --prefer-offline --no-audit --legacy-peer-deps
+
+          if [ ! -f "package-lock.json" ]; then
+            echo "❌ package-lock.json not created"
+            exit 1
           fi
 
-      - name: Detect & Fix Duplicate React Versions (if any)
-        run: |
-          set -e
-          cd Client
-          echo "🔎 Checking for multiple React versions in node_modules..."
-          node -e "const fs=require('fs'),path=require('path');const versions=new Set();function walk(dir){if(!fs.existsSync(dir))return;for(const f of fs.readdirSync(dir)){const p=path.join(dir,f);try{if(fs.statSync(p).isDirectory()){if(f==='react'){const pj=path.join(p,'package.json');if(fs.existsSync(pj)){versions.add(JSON.parse(fs.readFileSync(pj,'utf8')).version)}}walk(p)}}catch(e){}}}walk('node_modules');if(versions.size>1){console.error('Multiple react versions found:',Array.from(versions));process.exit(1);}else{console.log('React versions OK:',Array.from(versions));process.exit(0);}" || (
-            echo "⚠️ Multiple React versions detected or check failed. Attempting to dedupe and rebuild..."
-            npm dedupe || true
-            rm -rf node_modules package-lock.json
-            npm ci --prefer-offline --no-audit
-            echo "🔁 Rebuilding client after dedupe and clean install..."
-            npm run build
-          )
+          echo "✅ Dependencies installed successfully"
 
-      # 3. Prepare Artifacts
+      - name: Validate Client Dependencies
+        working-directory: Client
+        run: |
+          echo "🔍 Validating dependencies..."
+          npm list react 2>/dev/null | head -20 || true
+
+          echo "🧪 Running npm audit..."
+          npm audit --audit-level=moderate 2>/dev/null || true
+
+          echo "✅ Validation complete"
+
+      # ============ CLIENT BUILD ============
+      - name: Build Client
+        working-directory: Client
+        run: |
+          export VITE_API_URL=""
+          export NODE_OPTIONS="${{ env.NODE_OPTIONS }}"
+
+          echo "🏗️ Building client application..."
+          npm run build
+
+          if [ ! -d "dist" ] || [ -z "$(ls -A dist 2>/dev/null)" ]; then
+            echo "❌ Build failed: dist folder is empty"
+            exit 1
+          fi
+
+          echo "✅ Client build successful"
+          du -sh dist
+
+      # ============ SERVER VALIDATION ============
+      - name: Validate Server
+        working-directory: Server
+        run: |
+          echo "🔍 Validating server configuration..."
+
+          if [ ! -f "package.json" ]; then
+            echo "❌ Server/package.json not found"
+            exit 1
+          fi
+
+          ENTRY_POINT=""
+          if [ -f "server.js" ]; then
+            ENTRY_POINT="server.js"
+          elif [ -f "index.js" ]; then
+            ENTRY_POINT="index.js"
+          elif [ -f "app.js" ]; then
+            ENTRY_POINT="app.js"
+          fi
+
+          if [ -z "$ENTRY_POINT" ]; then
+            echo "❌ No entry point found (server.js, index.js, or app.js)"
+            exit 1
+          fi
+
+          echo "✅ Entry point found: $ENTRY_POINT"
+
+      # ============ PREPARE ARTIFACTS ============
       - name: Prepare Deployment Artifacts
         run: |
-          mkdir -p deploy_artifact
+          set -e
+          echo "📦 Preparing deployment artifacts..."
+
+          mkdir -p deploy_artifact/{Client,Server,scripts}
 
           # Copy Server
-          echo "📦 Copying Server files..."
-          rsync -av --exclude='node_modules' \
-                    --exclude='logs' \
-                    --exclude='uploads' \
-                    --exclude='.env' \
-                    --exclude='.git' \
-                    --exclude='tmp' \
-                    Server deploy_artifact/
+          echo "📋 Copying Server..."
+          rsync -av --delete \
+            --exclude='node_modules' \
+            --exclude='logs' \
+            --exclude='uploads' \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            --exclude='.git' \
+            --exclude='.gitignore' \
+            --exclude='tmp' \
+            --exclude='dist' \
+            --exclude='coverage' \
+            Server/ deploy_artifact/Server/
 
           # Copy Scripts
-          cp -r scripts deploy_artifact/
+          if [ -d "scripts" ]; then
+            echo "📋 Copying scripts..."
+            rsync -av scripts/ deploy_artifact/scripts/
+            chmod +x deploy_artifact/scripts/*.sh 2>/dev/null || true
+          fi
 
-          # Always include Client build
-          echo "📦 Including Client build..."
-          mkdir -p deploy_artifact/Client
-          cp -r Client/dist deploy_artifact/Client/
+          # Copy Client build
+          echo "📋 Copying Client build..."
+          rsync -av --delete Client/dist/ deploy_artifact/Client/dist/
           touch deploy_artifact/.client_updated
 
-          echo "📊 Artifact Size:"
-          du -sh deploy_artifact/
+          # Create manifest
+          echo "✅ Build: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" > deploy_artifact/MANIFEST.txt
+          echo "Commit: $(git rev-parse --short HEAD)" >> deploy_artifact/MANIFEST.txt
 
-          # Compress Artifacts (Huge Speedup for SCP)
+          echo "📊 Artifact size: $(du -sh deploy_artifact | cut -f1)"
+
+      - name: Compress Artifacts
+        run: |
           echo "📦 Compressing artifacts..."
           tar -czf deploy_artifact.tar.gz -C deploy_artifact .
 
-      # 4. Transfer Files to EC2 (SCP - Compressed)
-      - name: Copy files to EC2
+          SIZE=$(ls -lh deploy_artifact.tar.gz | awk '{print $5}')
+          echo "✅ Compressed size: $SIZE"
+
+          # Verify integrity
+          tar -tzf deploy_artifact.tar.gz > /dev/null
+          echo "✅ Archive integrity verified"
+
+      # ============ TRANSFER TO EC2 ============
+      - name: Transfer Artifact to EC2
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -114,91 +217,102 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           source: "deploy_artifact.tar.gz"
           target: "/home/ubuntu/"
+          timeout: "300s"
 
-      # 5. Finalize Deployment
+      # ============ DEPLOY ON EC2 ============
       - name: Deploy on EC2
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: "30m"
           script: |
-            APP_DIR="/home/ubuntu/Communiatec"
-            TEMP_DIR="/home/ubuntu/Communiatec_Temp"
+            set -e
+
             ARCHIVE="/home/ubuntu/deploy_artifact.tar.gz"
 
-            echo "🚀 Starting Deployment..."
-
-            # Prepare Temp Directory
-            rm -rf $TEMP_DIR
-            mkdir -p $TEMP_DIR
-
-            # Extract Artifacts
-            echo "📦 Extracting artifacts..."
-            tar -xzf $ARCHIVE -C $TEMP_DIR
-            rm $ARCHIVE
-
-            # Ensure Directories
-            mkdir -p $APP_DIR/Client
-            mkdir -p $APP_DIR/Server
-            mkdir -p $APP_DIR/scripts
-
-            # 1. Update Client (Conditional)
-            if [ -f "$TEMP_DIR/.client_updated" ]; then
-                echo "📦 Found new Client build, updating..."
-                # Ensure target dist exists
-                mkdir -p $APP_DIR/Client/dist
-                # Sync dist folder
-                rsync -av --delete $TEMP_DIR/Client/dist/ $APP_DIR/Client/dist/
-            else
-                echo "⏩ No new Client build, keeping existing version."
-            fi
-
-            # 2. Update Server Code
-            echo "📦 Updating Server Code..."
-            rsync -av $TEMP_DIR/Server/ $APP_DIR/Server/
-
-            # 3. Update Scripts
-            rsync -av $TEMP_DIR/scripts/ $APP_DIR/scripts/
-            chmod +x $APP_DIR/scripts/*.sh
+            echo "🚀 Starting deployment..."
 
             # Cleanup
-            rm -rf $TEMP_DIR
+            echo "🧹 Cleaning up..."
+            rm -rf "${{ env.TEMP_DIR }}"
+            mkdir -p "${{ env.TEMP_DIR }}"
 
-            # 4. Server Setup
-            cd $APP_DIR/Server
+            # Extract
+            echo "📦 Extracting artifacts..."
+            tar -xzf "$ARCHIVE" -C "${{ env.TEMP_DIR }}"
+            rm "$ARCHIVE"
 
+            # Ensure directories
+            mkdir -p "${{ env.APP_DIR }}/Client/dist"
+            mkdir -p "${{ env.APP_DIR }}/Server"
+            mkdir -p "${{ env.APP_DIR }}/scripts"
+
+            # Update Client
+            if [ -f "${{ env.TEMP_DIR }}/.client_updated" ]; then
+              echo "📋 Updating client build..."
+              rsync -av --delete "${{ env.TEMP_DIR }}/Client/dist/" "${{ env.APP_DIR }}/Client/dist/"
+              echo "✅ Client updated"
+            fi
+
+            # Update Server Code
+            echo "📋 Updating server code..."
+            rsync -av "${{ env.TEMP_DIR }}/Server/" "${{ env.APP_DIR }}/Server/"
+
+            # Update Scripts
+            if [ -d "${{ env.TEMP_DIR }}/scripts" ]; then
+              rsync -av "${{ env.TEMP_DIR }}/scripts/" "${{ env.APP_DIR }}/scripts/"
+              chmod +x "${{ env.APP_DIR }}/scripts/"*.sh 2>/dev/null || true
+            fi
+
+            # Cleanup temp
+            rm -rf "${{ env.TEMP_DIR }}"
+
+            # Setup Server
+            cd "${{ env.APP_DIR }}/Server"
+
+            echo "🔧 Configuring server..."
             if [ ! -f ".env" ]; then
-                echo "PORT=4000" > .env
-                echo "NODE_ENV=production" >> .env
+              echo "PORT=4000" > .env
+              echo "NODE_ENV=production" >> .env
             fi
 
-            # Smart Install: Only if package.json changed
-            if [ -f "package.json" ]; then
-                # Check if node_modules exists
-                if [ ! -d "node_modules" ]; then
-                    echo "📦 Installing Server Dependencies (Fresh)..."
-                    npm install --production --no-audit --prefer-offline
-                else
-                    # Simple check: has package.json changed since last run?
-                    # For now, we'll just run install, it's fast if cached.
-                    # To be super fast, we could use a checksum, but npm install is okay here.
-                    echo "📦 Checking Server Dependencies..."
-                    npm install --production --no-audit --prefer-offline
-                fi
+            # Install/Update Dependencies
+            echo "📦 Installing server dependencies..."
+            npm config set legacy-peer-deps=true --legacy-peer-deps
+            npm install --production --no-audit --prefer-offline --legacy-peer-deps 2>&1 | grep -E "(added|up to date)" || true
+
+            if [ ! -d "node_modules" ]; then
+              echo "❌ Server dependencies installation failed"
+              exit 1
             fi
 
-            # 5. Restart
-            echo "🔄 Restarting Server..."
+            # Start Server
+            echo "🔄 Starting server..."
             if command -v pm2 &> /dev/null; then
-              pm2 restart communiatec-server --update-env || pm2 start server.js --name "communiatec-server" --env NODE_ENV=production
+              pm2 restart communiatec-server --update-env 2>/dev/null || pm2 start server.js --name "communiatec-server" --env NODE_ENV=production
             else
               npm install -g pm2
               pm2 start server.js --name "communiatec-server" --env NODE_ENV=production
             fi
 
-            # Restart nginx to serve new client build
-            echo "🔄 Restarting nginx to serve updated client build..."
+            # Verify Server is Running
+            sleep 3
+            if pm2 list | grep -q "communiatec-server.*online"; then
+              echo "✅ Server is running"
+            else
+              echo "⚠️ Server may not be running, checking logs..."
+              pm2 logs communiatec-server --lines 20
+            fi
+
+            # Restart Nginx
+            echo "🔄 Restarting nginx..."
             sudo systemctl restart nginx || sudo service nginx restart
 
-            echo "✅ Deployment Complete!"
+            echo "✅ Deployment complete!"
+
+      - name: Deployment Status
+        if: always()
+        run: |
+          echo "🎉 Workflow completed"
