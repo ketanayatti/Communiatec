@@ -12,6 +12,8 @@ export default defineConfig({
       jsxRuntime: "automatic",
     }),
     VitePWA({
+      selfDestroying: true,
+      devOptions: { enabled: false },
       registerType: "autoUpdate",
       includeAssets: [
         "favicon.svg",
@@ -46,8 +48,6 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      react: path.resolve(__dirname, "./node_modules/react"),
-      "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
     },
     dedupe: [
       "react",
@@ -65,56 +65,10 @@ export default defineConfig({
     target: "es2015",
     commonjsOptions: {
       include: [/node_modules/],
+      transformMixedEsModules: true,
+      requireReturnsDefault: "auto",
     },
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (id.includes("node_modules")) {
-            // React and UI libraries chunk
-            if (
-              id.includes("react") ||
-              id.includes("react-dom") ||
-              id.includes("react-router") ||
-              id.includes("zustand") ||
-              id.includes("use-sync-external-store") ||
-              id.includes("prop-types") ||
-              id.includes("@radix-ui") ||
-              id.includes("lucide-react") ||
-              id.includes("react-icons") ||
-              id.includes("@heroicons") ||
-              id.includes("framer-motion") ||
-              id.includes("clsx") ||
-              id.includes("tailwind-merge") ||
-              id.includes("socket.io-client") ||
-              id.includes("sonner") ||
-              id.includes("axios") ||
-              id.includes("date-fns") ||
-              id.includes("moment") ||
-              id.includes("uuid")
-            ) {
-              return "vendor_react";
-            }
-
-            // Monaco Editor - separate chunk due to size
-            if (id.includes("monaco-editor") || id.includes("@monaco-editor")) {
-              return "vendor_monaco";
-            }
-
-            // Three.js and 3D libraries
-            if (
-              id.includes("three") ||
-              id.includes("@react-three") ||
-              id.includes("vanta")
-            ) {
-              return "vendor_three";
-            }
-
-            // All other node_modules
-            return "vendor_libs";
-          }
-        },
-      },
-    },
+    rollupOptions: {},
   },
   optimizeDeps: {
     include: [
@@ -125,6 +79,8 @@ export default defineConfig({
       "socket.io-client",
       "sonner",
       "use-sync-external-store",
+      "use-sync-external-store/shim",
+      "use-sync-external-store/shim/with-selector",
       "zustand",
       "monaco-editor",
     ],
@@ -136,7 +92,6 @@ export default defineConfig({
     },
   },
   define: {
-    "process.env.NODE_ENV": '"production"',
     global: "globalThis",
   },
 });
