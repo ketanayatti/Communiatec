@@ -30,7 +30,7 @@ Built on the **MERN Stack** and powered by **Socket.io**, it features a robust a
 
 ## 🌐 Live Demo
 
-- [Access the Live Demo](https://communiatec-demo.vercel.app)
+- [Access the Live Demo](https://http://3.226.122.22/))
 
 ---
 
