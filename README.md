@@ -30,7 +30,7 @@ Built on the **MERN Stack** and powered by **Socket.io**, it features a robust a
 
 ## 🌐 Live Demo
 
-- [Access the Live Demo](https://http://3.226.122.22/))
+- [Access the Live Demo](http://3.226.122.22/)
 
 ---
 
