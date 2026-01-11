@@ -119,6 +119,87 @@ npm run dev
 
 ---
 
+## 🧪 Local Development (Docker Compose)
+
+If you prefer an isolated setup without installing MongoDB locally, use Docker.
+
+1. Start the full stack (MongoDB, Server, Client):
+
+```cmd
+docker compose up -d
+```
+
+2. Open the app:
+
+- Client: `http://localhost:5173`
+- API health: `http://localhost:4000/api/health`
+
+3. Tail logs (optional):
+
+```cmd
+docker compose logs -f server
+```
+
+4. Stop everything:
+
+```cmd
+docker compose down -v
+```
+
+Notes:
+
+- The compose file uses a local MongoDB with a seeded user and DB.
+- Redis is disabled by default (`REDIS_URL=disabled`).
+- Client is pre-configured to call `http://localhost:4000`.
+
+---
+
+## 📦 Safe AWS Updates (No Downtime)
+
+Production runs on EC2 with Nginx and PM2. To avoid interrupting users, deploy with a Blue/Green switch on different ports and only cut traffic after health checks.
+
+### Option A: Blue/Green on one EC2 (recommended)
+
+1. SSH to the server and start a new instance on port 4001:
+
+```bash
+cd ~/Communiatec/Server
+PORT=4001 pm2 start server.js --name communiatec-green --update-env
+```
+
+2. Verify health before switching:
+
+```bash
+curl -f http://localhost:4001/api/health
+```
+
+3. Switch Nginx to the new port and reload:
+
+- Edit your Nginx site (the proxy for `/api` currently points to `http://localhost:4000`). Change it to `http://localhost:4001`.
+- Test and reload Nginx:
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+4. Keep an eye on logs and traffic. If stable, stop the old app:
+
+```bash
+pm2 delete communiatec-server   # old 4000 instance name (if used)
+```
+
+Rollback: switch Nginx back to 4000, reload, and stop `communiatec-green`.
+
+Tip: You can keep both definitions and only change the port in Nginx for instant cutover.
+
+### Option B: CI/CD via GitHub Actions
+
+This repo is set up to build the Client in CI and update the EC2 box (see `DEPLOYMENT.md`). If you notice brief interruptions on `pm2 restart`, move to Option A or use PM2 cluster with sticky sessions (required for Socket.io).
+
+Cluster note: enabling `pm2 start server.js -i 2` can allow `pm2 reload` with minimal downtime, but Socket.io usually requires sticky sessions at Nginx. Prefer Blue/Green unless you add stickiness.
+
+---
+
 ## 🗺️ Roadmap
 
 - [x] **Core Features** (Chat, Auth, Vault)

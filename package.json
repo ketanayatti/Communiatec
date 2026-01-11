@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "docker": "^1.0.0",
     "winston": "^3.18.3"
   }
 }

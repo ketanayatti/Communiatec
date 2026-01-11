@@ -70,7 +70,6 @@ if (allowedOrigins.length === 0) {
   ].filter(Boolean);
   allowedOrigins = Array.from(new Set(defaults));
 }
-
 // Optional: allow Vercel preview deployments if enabled
 const allowVercelPreviews =
   String(process.env.ALLOW_VERCEL_PREVIEWS || "true") === "true";
