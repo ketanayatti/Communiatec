@@ -39,7 +39,8 @@ const CodeEditor = () => {
 
   // Socket and connection states
   const [codeSocket, setCodeSocket] = useState(null);
-  const isConnected = codeConnectionState === "connected" && codeSocket?.connected;
+  const isConnected =
+    codeConnectionState === "connected" && codeSocket?.connected;
 
   // Session and editor states
   const [sessionData, setSessionData] = useState(null);
@@ -318,8 +319,9 @@ const CodeEditor = () => {
 
     // Emit to code socket - check both state and actual socket connection
     const socketConnected = codeSocket?.connected || false;
-    const canEmit = socketConnected && sessionId && codeConnectionState === "connected";
-    
+    const canEmit =
+      socketConnected && sessionId && codeConnectionState === "connected";
+
     if (canEmit) {
       console.log("📡 Emitting code change to server");
 
