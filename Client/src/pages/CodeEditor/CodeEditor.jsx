@@ -39,7 +39,7 @@ const CodeEditor = () => {
 
   // Socket and connection states
   const [codeSocket, setCodeSocket] = useState(null);
-  const isConnected = codeConnectionState === "connected";
+  const isConnected = codeConnectionState === "connected" && codeSocket?.connected;
 
   // Session and editor states
   const [sessionData, setSessionData] = useState(null);
@@ -82,6 +82,16 @@ const CodeEditor = () => {
     }
   }, [userInfo, sessionId]);
 
+  // Update socket state when connection state changes to force re-render
+  useEffect(() => {
+    if (codeSocket) {
+      console.log("🔄 Connection state changed:", codeConnectionState);
+      console.log("🔄 Socket.connected:", codeSocket.connected);
+      // Force re-render to update connection checks
+      setCodeSocket((prev) => prev);
+    }
+  }, [codeConnectionState]);
+
   const setupCodeSocketEvents = (socket) => {
     // Remove any existing listeners to prevent duplicates
     socket.off("session-joined");
@@ -95,6 +105,22 @@ const CodeEditor = () => {
     socket.off("language-update");
     socket.off("pong");
     socket.off("code-ack");
+    socket.off("connect");
+    socket.off("disconnect");
+
+    // Monitor socket connection state changes
+    socket.on("connect", () => {
+      console.log("✅ Code socket connected event received in component");
+      console.log("✅ Socket.connected:", socket.connected);
+      // Force a re-render by updating the socket state
+      setCodeSocket(socket);
+    });
+
+    socket.on("disconnect", (reason) => {
+      console.log("❌ Code socket disconnected in component:", reason);
+      // Force a re-render
+      setCodeSocket(socket);
+    });
 
     // Session events
     socket.on("session-joined", (data) => {
@@ -290,8 +316,11 @@ const CodeEditor = () => {
 
     setCode(newCode);
 
-    // Emit to code socket
-    if (isConnected && sessionId) {
+    // Emit to code socket - check both state and actual socket connection
+    const socketConnected = codeSocket?.connected || false;
+    const canEmit = socketConnected && sessionId && codeConnectionState === "connected";
+    
+    if (canEmit) {
       console.log("📡 Emitting code change to server");
 
       const success = emitCode("code-change", {
@@ -320,13 +349,15 @@ const CodeEditor = () => {
       }, 2000);
     } else {
       console.log("⚠️ Cannot emit code change - not connected or no session");
-      console.log("⚠️ Connected:", isConnected);
+      console.log("⚠️ Socket connected:", socketConnected);
+      console.log("⚠️ Connection state:", codeConnectionState);
       console.log("⚠️ Session ID:", sessionId);
     }
   };
 
   const handleCursorChange = (position) => {
-    if (isConnected && sessionId) {
+    const socketConnected = codeSocket?.connected || false;
+    if (socketConnected && sessionId && codeConnectionState === "connected") {
       emitCode("cursor-move", {
         sessionId,
         position,
@@ -338,7 +369,8 @@ const CodeEditor = () => {
   const handleLanguageChange = (newLanguage) => {
     setLanguage(newLanguage);
 
-    if (isConnected && sessionId) {
+    const socketConnected = codeSocket?.connected || false;
+    if (socketConnected && sessionId && codeConnectionState === "connected") {
       emitCode("language-change", {
         sessionId,
         language: newLanguage,
