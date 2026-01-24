@@ -417,6 +417,10 @@ export const SocketProvider = ({ children }) => {
         sessionId,
         user: userInfo,
       });
+
+      // CRITICAL FIX: Fetch latest session state after reconnection
+      console.log("🔄 Fetching latest session state after reconnection...");
+      codeSocketInstance.emit("get-session-info", { sessionId });
     });
 
     codeSocket.current = codeSocketInstance;

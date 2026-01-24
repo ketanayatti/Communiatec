@@ -224,8 +224,8 @@ const handleCodeCollaboration = (io) => {
           timestamp: timestamp || Date.now(),
         };
 
-        // Use the namespace to broadcast to other users in the room
-        socket.to(sessionId).emit("code-update", updateData);
+        // Use the namespace to broadcast to other users in the room (CRITICAL: use codeNamespace, not socket.to)
+        codeNamespace.to(sessionId).emit("code-update", updateData);
 
         // Log how many sockets are in the room after broadcast
         try {
@@ -280,7 +280,7 @@ const handleCodeCollaboration = (io) => {
         );
 
         // Broadcast cursor position to other users
-        socket.to(sessionId).emit("cursor-update", {
+        codeNamespace.to(sessionId).emit("cursor-update", {
           userId: socket.userId,
           position,
           timestamp: Date.now(),
@@ -298,7 +298,7 @@ const handleCodeCollaboration = (io) => {
     socket.on("typing-start", (data) => {
       const { sessionId } = data;
       if (socket.sessionId === sessionId) {
-        socket.to(sessionId).emit("user-typing", {
+        codeNamespace.to(sessionId).emit("user-typing", {
           userId: socket.userId,
           isTyping: true,
         });
@@ -309,7 +309,7 @@ const handleCodeCollaboration = (io) => {
     socket.on("typing-stop", (data) => {
       const { sessionId } = data;
       if (socket.sessionId === sessionId) {
-        socket.to(sessionId).emit("user-typing", {
+        codeNamespace.to(sessionId).emit("user-typing", {
           userId: socket.userId,
           isTyping: false,
         });
@@ -329,7 +329,7 @@ const handleCodeCollaboration = (io) => {
           { language, lastModified: new Date() }
         );
 
-        socket.to(sessionId).emit("language-update", {
+        codeNamespace.to(sessionId).emit("language-update", {
           language,
           userId: socket.userId,
         });
@@ -357,7 +357,7 @@ const handleCodeCollaboration = (io) => {
 
           if (session) {
             // Notify other users about disconnection
-            socket.to(socket.sessionId).emit("user-left", {
+            codeNamespace.to(socket.sessionId).emit("user-left", {
               userId: socket.userId,
             });
 

@@ -83,6 +83,19 @@ const CodeEditor = () => {
   }, [userInfo, sessionId]);
 
   const setupCodeSocketEvents = (socket) => {
+    // Remove any existing listeners to prevent duplicates
+    socket.off("session-joined");
+    socket.off("error");
+    socket.off("code-update");
+    socket.off("participants-update");
+    socket.off("user-joined");
+    socket.off("user-left");
+    socket.off("cursor-update");
+    socket.off("user-typing");
+    socket.off("language-update");
+    socket.off("pong");
+    socket.off("code-ack");
+
     // Session events
     socket.on("session-joined", (data) => {
       console.log("🎯 Successfully joined session:", data);
@@ -180,6 +193,29 @@ const CodeEditor = () => {
     socket.on("code-ack", (ack) => {
       console.log("📨 Server acknowledged code-change:", ack);
     });
+
+    // Handle session info response (used for reconnection sync)
+    socket.on("session-info", async (data) => {
+      console.log("🔄 Received session info after reconnection:", data);
+      // Reload session data to ensure we have the latest code
+      if (sessionId && sessionData) {
+        try {
+          const response = await apiClient.get(`/api/code/join/${sessionId}`);
+          if (response.data.success) {
+            console.log("✅ Synced latest session data after reconnection");
+            isUpdatingFromRemote.current = true;
+            setCode(response.data.session.code || "");
+            setLanguage(response.data.session.language || "javascript");
+            setParticipants(response.data.session.participants || []);
+            setTimeout(() => {
+              isUpdatingFromRemote.current = false;
+            }, 300);
+          }
+        } catch (error) {
+          console.error("Failed to sync session after reconnection:", error);
+        }
+      }
+    });
   };
 
   // Load session data
@@ -237,18 +273,15 @@ const CodeEditor = () => {
     console.log("📝 New code length:", newCode?.length);
     console.log("📝 Socket connected:", isConnected);
 
-    // Skip if this is a remote update
+    // Skip ONLY if this is a remote update in progress
     if (isUpdatingFromRemote.current) {
       console.log("⏭️ Skipping local change (remote update in progress)");
       return;
     }
 
-    // Check if this is too close to a recent remote update
-    if (timestamp && timestamp <= lastRemoteUpdate.current + 500) {
-      console.log("⏭️ Skipping local change (too close to remote update)");
-      return;
-    }
-
+    // Don't use aggressive timestamp checking - it blocks too many legitimate updates
+    // Just emit the change immediately
+    
     // Ensure we've joined the session room on the server before emitting
     if (!sessionJoinedRef.current) {
       console.warn("⚠️ Not joined to session yet - skipping emit");
@@ -353,6 +386,18 @@ const CodeEditor = () => {
       };
     }
   }, [codeSocket, isConnected]);
+
+  // Monitor connection state to refetch session on reconnection
+  useEffect(() => {
+    if (isConnected && sessionId && sessionJoinedRef.current) {
+      console.log("🔄 Connection state changed - refreshing session data...");
+      // Small delay to ensure session is properly restored
+      const timer = setTimeout(() => {
+        loadSession();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isConnected, sessionId]);
 
   // Cleanup typing timeout on unmount
   useEffect(() => {
