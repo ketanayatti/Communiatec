@@ -42,7 +42,9 @@ export const SocketProvider = ({ children }) => {
   // Chat Socket (existing functionality)
   useEffect(() => {
     if (userInfo) {
-      const SOCKET_URL = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}${window.location.port ? ":" + window.location.port : ""}`;
+      const SOCKET_URL =
+        import.meta.env.VITE_API_URL ||
+        `${window.location.protocol}//${window.location.hostname}${window.location.port ? ":" + window.location.port : ""}`;
       socket.current = io(SOCKET_URL, {
         withCredentials: true,
         query: {
@@ -76,7 +78,7 @@ export const SocketProvider = ({ children }) => {
 
       socket.current.on("reconnect", (attemptNumber) => {
         console.log(
-          `✅ Reconnected to chat socket server after ${attemptNumber} attempts`
+          `✅ Reconnected to chat socket server after ${attemptNumber} attempts`,
         );
         setConnectionState("connected");
       });
@@ -269,14 +271,14 @@ export const SocketProvider = ({ children }) => {
                 border: "1px solid rgba(99, 102, 241, 0.3)",
                 color: "white",
               },
-            }
+            },
           );
 
           // Emit event to update shared files count
           window.dispatchEvent(
             new CustomEvent("vaultFileSharedReceived", {
               detail: { sharedFile, notification },
-            })
+            }),
           );
         } catch (error) {
           console.error("Error handling vault file shared:", error);
@@ -295,7 +297,7 @@ export const SocketProvider = ({ children }) => {
                 border: "1px solid rgba(34, 197, 94, 0.3)",
                 color: "white",
               },
-            }
+            },
           );
         } catch (error) {
           console.error("Error handling vault file accepted:", error);
@@ -308,7 +310,7 @@ export const SocketProvider = ({ children }) => {
           window.dispatchEvent(
             new CustomEvent("vaultNotificationCountUpdated", {
               detail: { count },
-            })
+            }),
           );
           console.log("📊 Vault notification count updated:", count);
         } catch (error) {
@@ -357,7 +359,7 @@ export const SocketProvider = ({ children }) => {
 
     if (!userInfo || !sessionId) {
       console.log(
-        "⚠️ Cannot initialize code socket - missing userInfo or sessionId"
+        "⚠️ Cannot initialize code socket - missing userInfo or sessionId",
       );
       return null;
     }

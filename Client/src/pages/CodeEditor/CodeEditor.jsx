@@ -44,7 +44,7 @@ const CodeEditor = () => {
   // Session and editor states
   const [sessionData, setSessionData] = useState(null);
   const [code, setCode] = useState(
-    '// Welcome to Communiatec Code Collaboration\n// Start coding together!\nconsole.log("Hello, World!");'
+    '// Welcome to Communiatec Code Collaboration\n// Start coding together!\nconsole.log("Hello, World!");',
   );
   const [language, setLanguage] = useState("javascript");
   const [participants, setParticipants] = useState([]);
@@ -162,8 +162,8 @@ const CodeEditor = () => {
     socket.on("cursor-update", (data) => {
       setParticipants((prev) =>
         prev.map((p) =>
-          p.userId === data.userId ? { ...p, cursor: data.position } : p
-        )
+          p.userId === data.userId ? { ...p, cursor: data.position } : p,
+        ),
       );
     });
 
@@ -281,7 +281,7 @@ const CodeEditor = () => {
 
     // Don't use aggressive timestamp checking - it blocks too many legitimate updates
     // Just emit the change immediately
-    
+
     // Ensure we've joined the session room on the server before emitting
     if (!sessionJoinedRef.current) {
       console.warn("⚠️ Not joined to session yet - skipping emit");
@@ -967,7 +967,7 @@ const CodeEditor = () => {
                               hour: "2-digit",
                               minute: "2-digit",
                               second: "2-digit",
-                            }
+                            },
                           )
                         : "N/A"}
                     </span>
