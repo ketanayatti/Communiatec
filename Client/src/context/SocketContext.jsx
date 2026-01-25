@@ -388,7 +388,7 @@ export const SocketProvider = ({ children }) => {
     });
 
     // Connection events
-    codeSocketInstance.on("connect", () => {
+    const onConnect = () => {
       console.log("✅ Connected to code collaboration server");
       setCodeConnectionState("connected");
 
@@ -398,7 +398,13 @@ export const SocketProvider = ({ children }) => {
         sessionId,
         user: userInfo,
       });
-    });
+    };
+
+    if (codeSocketInstance.connected) {
+      onConnect();
+    } else {
+      codeSocketInstance.on("connect", onConnect);
+    }
 
     codeSocketInstance.on("disconnect", (reason) => {
       console.log("❌ Code socket disconnected:", reason);

@@ -110,12 +110,18 @@ const CodeEditor = () => {
     socket.off("disconnect");
 
     // Monitor socket connection state changes
-    socket.on("connect", () => {
+    const onConnect = () => {
       console.log("✅ Code socket connected event received in component");
       console.log("✅ Socket.connected:", socket.connected);
       // Update connection state
       setSocketConnected(true);
-    });
+    };
+
+    if (socket.connected) {
+      onConnect();
+    } else {
+      socket.on("connect", onConnect);
+    }
 
     socket.on("disconnect", (reason) => {
       console.log("❌ Code socket disconnected in component:", reason);

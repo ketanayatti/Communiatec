@@ -13,68 +13,68 @@ const handleCodeCollaboration = (io) => {
     // Join code session
     socket.on("join-code-session", async (data) => {
       const { sessionId, user } = data;
+      
+      if (!sessionId || !user) {
+        console.log("❌ Missing sessionId or user data in join-code-session");
+        socket.emit("error", { message: "Invalid session or user data" });
+        return;
+      }
+
       const userId = (user._id || user.id)?.toString();
+      
+      if (!userId) {
+        console.log("❌ Could not determine userId from user object:", user);
+        socket.emit("error", { message: "User identification failed" });
+        return;
+      }
 
       // Set socket properties IMMEDIATELY before any async operations
       socket.userId = userId;
       socket.sessionId = sessionId;
       socket.userInfo = user;
 
-      console.log("🔍 Debug user data:", {
-        userId: userId,
-        userObject: user,
-        socketId: socket.id,
-      });
-      console.log(
-        `👤 User ${userId} (${user.firstName}) joining session: ${sessionId}`,
-      );
+      console.log(`👤 User ${userId} (${user.firstName || user.username}) attempting to join session: ${sessionId}`);
 
       try {
-        // Leave any previous rooms
-        const rooms = Array.from(socket.rooms);
-        rooms.forEach((room) => {
+        // Leave any previous rooms in this namespace
+        for (const room of socket.rooms) {
           if (room !== socket.id) {
             socket.leave(room);
           }
-        });
+        }
 
         // Join the new session room
         await socket.join(sessionId);
-
         console.log(`✅ Socket ${socket.id} joined room ${sessionId}`);
 
-        // Get or create session
+        // Get session
         let session = await CodeSession.findOne({ sessionId });
         if (!session) {
-          console.log(`❌ Session ${sessionId} not found`);
+          console.log(`❌ Session ${sessionId} not found in database`);
           socket.emit("error", { message: "Session not found" });
           return;
         }
 
         // Generate unique color for user
         const colors = [
-          "#FF6B6B",
-          "#4ECDC4",
-          "#45B7D1",
-          "#96CEB4",
-          "#FFEAA7",
-          "#DDA0DD",
-          "#98D8C8",
-          "#F7DC6F",
+          "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", 
+          "#FFEAA7", "#DDA0DD", "#98D8C8", "#F7DC6F"
         ];
-        const usedColors = session.participants.map((p) => p.color);
-        const availableColors = colors.filter(
-          (color) => !usedColors.includes(color),
-        );
-        const userColor =
-          availableColors.length > 0
-            ? availableColors[0]
-            : colors[Math.floor(Math.random() * colors.length)];
-
-        // Add or update participant
+        
         const existingParticipantIndex = session.participants.findIndex(
           (p) => p.userId?.toString() === userId,
         );
+
+        let userColor;
+        if (existingParticipantIndex >= 0) {
+          userColor = session.participants[existingParticipantIndex].color;
+        } else {
+          const usedColors = session.participants.map(p => p.color);
+          const availableColors = colors.filter(color => !usedColors.includes(color));
+          userColor = availableColors.length > 0 
+            ? availableColors[0] 
+            : colors[Math.floor(Math.random() * colors.length)];
+        }
 
         const participantData = {
           userId: userId,
@@ -91,57 +91,31 @@ const handleCodeCollaboration = (io) => {
           session.participants.push(participantData);
         }
 
+        session.markModified('participants');
         await session.save();
-        console.log(
-          `💾 Session saved with ${session.participants.length} participants`,
-        );
+        
+        console.log(`💾 Session saved with ${session.participants.length} participants`);
 
         // Send current session data to joining user
         socket.emit("session-joined", {
           sessionId: session.sessionId,
           code: session.code,
           language: session.language,
-          participants: session.participants.map((p) => ({
-            userId: p.userId,
-            username: p.username,
-            color: p.color,
-            cursor: p.cursor,
-          })),
+          participants: session.participants,
+          title: session.title
         });
 
-        // Notify other users about new participant
-        socket.to(sessionId).emit("user-joined", {
-          userId: participantData.userId,
-          username: participantData.username,
-          color: participantData.color,
-        });
+        // Notify others in the session
+        socket.to(sessionId).emit("user-joined", participantData);
+        
+        // Broadcast updated participants list to everyone in the room
+        codeNamespace.to(sessionId).emit("participants-update", session.participants);
+        
+        console.log(`📢 Broadcasted participants update for session ${sessionId}`);
 
-        // Send updated participants list to ALL users in room
-        const currentParticipants = session.participants.map((p) => ({
-          userId: p.userId,
-          username: p.username,
-          color: p.color,
-          cursor: p.cursor,
-        }));
-
-        codeNamespace
-          .to(sessionId)
-          .emit("participants-update", currentParticipants);
-        console.log(
-          `📢 Broadcasted participants update to room ${sessionId} (${currentParticipants.length} users)`,
-        );
-
-        // Log room info for debugging
-        const roomClients = await codeNamespace.in(sessionId).fetchSockets();
-        console.log(
-          `🏠 Room ${sessionId} now has ${roomClients.length} connected sockets`,
-        );
       } catch (error) {
-        console.error("❌ Error joining code session:", error);
-        socket.emit("error", {
-          message: "Failed to join session",
-          error: error.message,
-        });
+        console.error(`🚨 Error in join-code-session:`, error);
+        socket.emit("error", { message: "Failed to join session", error: error.message });
       }
     });
 
