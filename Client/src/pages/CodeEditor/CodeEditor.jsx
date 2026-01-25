@@ -130,10 +130,19 @@ const CodeEditor = () => {
       sessionJoinedRef.current = false;
     });
 
+    // Track our own socket ID for filtering updates
+    let mySocketId = socket.id;
+
     // Session events
     socket.on("session-joined", (data) => {
       console.log("🎯 Successfully joined session:", data);
       console.log("📝 Received code length:", data.code?.length);
+      console.log("🔑 My socket ID from server:", data.mySocketId);
+      
+      // Store our socket ID from server response for reliable filtering
+      if (data.mySocketId) {
+        mySocketId = data.mySocketId;
+      }
 
       isUpdatingFromRemote.current = true;
       setCode(data.code || "");
@@ -157,15 +166,23 @@ const CodeEditor = () => {
 
     // Real-time collaboration events
     socket.on("code-update", (data) => {
-      console.log("📝 Received code update from user:", data.userId);
-      console.log("📝 New code length:", data.code?.length);
-      console.log("📝 Current user ID:", currentUserId);
-      console.log("📝 Sender socket ID:", data.socketId);
-      console.log("📝 My socket ID:", socket.id);
+      console.log("📝 Received code update:", {
+        fromUserId: data.userId,
+        fromSocketId: data.socketId,
+        myUserId: currentUserId,
+        mySocketId: mySocketId,
+        socketId: socket.id,
+        codeLength: data.code?.length,
+      });
 
-      // Only apply if it's not from current user
-      if (data.userId !== currentUserId && data.socketId !== socket.id) {
-        console.log("✅ Applying remote code update");
+      // CRITICAL: Server now uses socket.to() so we should NOT receive our own updates
+      // But keep the filter as a safety measure
+      const isFromMe = 
+        (data.userId && currentUserId && data.userId.toString() === currentUserId.toString()) ||
+        (data.socketId && (data.socketId === mySocketId || data.socketId === socket.id));
+
+      if (!isFromMe) {
+        console.log("✅ Applying remote code update from another user");
         isUpdatingFromRemote.current = true;
         lastRemoteUpdate.current = data.timestamp || Date.now();
         setCode(data.code || "");
@@ -174,7 +191,8 @@ const CodeEditor = () => {
           isUpdatingFromRemote.current = false;
         }, 200);
       } else {
-        console.log("⏭️ Skipping own code update");
+        // This should rarely happen now that server uses socket.to()
+        console.log("⏭️ Skipping own code update (shouldn't happen with server fix)");
       }
     });
 

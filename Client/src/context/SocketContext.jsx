@@ -351,8 +351,14 @@ export const SocketProvider = ({ children }) => {
 
   // Code Collaboration Socket - SEPARATE CONNECTION
   const initializeCodeSocket = (sessionId) => {
-    if (codeSocket.current) {
-      console.log("🧹 Cleaning up existing code socket...");
+    // Check if we already have a connected socket for this session
+    if (codeSocket.current && codeSocket.current.connected) {
+      const existingSessionId = codeSocket.current.sessionId;
+      if (existingSessionId === sessionId) {
+        console.log("♻️ Reusing existing code socket for session:", sessionId);
+        return codeSocket.current;
+      }
+      console.log("🧹 Disconnecting existing code socket for different session...");
       codeSocket.current.disconnect();
       codeSocket.current = null;
     }
@@ -364,32 +370,40 @@ export const SocketProvider = ({ children }) => {
       return null;
     }
 
+    const userId = (userInfo._id || userInfo.id)?.toString();
     console.log("🔌 Initializing code collaboration socket...");
+    console.log("🔌 User ID:", userId);
+    console.log("🔌 Session ID:", sessionId);
 
-    // Create connection to /code namespace
+    // Create connection to /code namespace with forceNew to ensure unique connection
     const SOCKET_URL = getBaseUrl();
     const codeSocketInstance = io(`${SOCKET_URL}/code`, {
       withCredentials: true,
       auth: {
         token: localStorage.getItem("authToken"),
-        userId: (userInfo._id || userInfo.id)?.toString(),
+        userId: userId,
       },
       query: {
-        userId: (userInfo._id || userInfo.id)?.toString(),
+        userId: userId,
         sessionId: sessionId,
       },
-      transports: ["polling", "websocket"],
+      transports: ["websocket", "polling"], // Prefer websocket for real-time
       upgrade: true,
       timeout: 20000,
-      forceNew: true,
+      forceNew: true, // CRITICAL: Always create a new connection
       reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 2000,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
     });
+
+    // Store session ID on socket instance for reference
+    codeSocketInstance.sessionId = sessionId;
 
     // Connection events
     const onConnect = () => {
       console.log("✅ Connected to code collaboration server");
+      console.log("✅ Socket ID:", codeSocketInstance.id);
       setCodeConnectionState("connected");
 
       // Auto-join session on connect
@@ -412,15 +426,16 @@ export const SocketProvider = ({ children }) => {
     });
 
     codeSocketInstance.on("connect_error", (error) => {
-      console.error("🚨 Code socket connection error:", error);
+      console.error("🚨 Code socket connection error:", error.message);
       setCodeConnectionState("error");
     });
 
-    codeSocketInstance.on("reconnect", () => {
-      console.log("✅ Code socket reconnected");
+    codeSocketInstance.on("reconnect", (attemptNumber) => {
+      console.log(`✅ Code socket reconnected after ${attemptNumber} attempts`);
+      console.log("✅ New Socket ID after reconnect:", codeSocketInstance.id);
       setCodeConnectionState("connected");
 
-      // Rejoin session on reconnect
+      // Rejoin session on reconnect with fresh socket
       codeSocketInstance.emit("join-code-session", {
         sessionId,
         user: userInfo,
@@ -429,6 +444,11 @@ export const SocketProvider = ({ children }) => {
       // CRITICAL FIX: Fetch latest session state after reconnection
       console.log("🔄 Fetching latest session state after reconnection...");
       codeSocketInstance.emit("get-session-info", { sessionId });
+    });
+
+    codeSocketInstance.on("reconnect_attempt", (attemptNumber) => {
+      console.log(`🔄 Code socket reconnection attempt ${attemptNumber}...`);
+      setCodeConnectionState("reconnecting");
     });
 
     codeSocket.current = codeSocketInstance;
