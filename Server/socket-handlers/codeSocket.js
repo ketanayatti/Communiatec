@@ -13,40 +13,58 @@ const handleCodeCollaboration = (io) => {
     // Join code session
     socket.on("join-code-session", async (data) => {
       const { sessionId, user } = data;
+
+      if (!sessionId || !user) {
+        console.log("❌ Missing sessionId or user data in join-code-session");
+        socket.emit("error", { message: "Invalid session or user data" });
+        return;
+      }
+
       const userId = (user._id || user.id)?.toString();
+
+      if (!userId) {
+        console.log("❌ Could not determine userId from user object:", user);
+        socket.emit("error", { message: "User identification failed" });
+        return;
+      }
 
       // Set socket properties IMMEDIATELY before any async operations
       socket.userId = userId;
       socket.sessionId = sessionId;
       socket.userInfo = user;
 
-      console.log("🔍 Debug user data:", {
-        userId: userId,
-        userObject: user,
-        socketId: socket.id,
-      });
       console.log(
         `👤 User ${userId} (${user.firstName}) joining session: ${sessionId}`,
       );
+      console.log(`🔌 Socket ID: ${socket.id}`);
 
       try {
-        // Leave any previous rooms
-        const rooms = Array.from(socket.rooms);
-        rooms.forEach((room) => {
+        // Leave any previous rooms in this namespace (except the socket's own room)
+        const currentRooms = Array.from(socket.rooms);
+        for (const room of currentRooms) {
           if (room !== socket.id) {
-            socket.leave(room);
+            await socket.leave(room);
+            console.log(`🚪 Left previous room: ${room}`);
           }
-        });
+        }
 
         // Join the new session room
         await socket.join(sessionId);
 
-        console.log(`✅ Socket ${socket.id} joined room ${sessionId}`);
+        // Verify join was successful
+        const roomsAfterJoin = Array.from(socket.rooms);
+        console.log(`✅ Socket ${socket.id} rooms after join:`, roomsAfterJoin);
 
-        // Get or create session
+        if (!roomsAfterJoin.includes(sessionId)) {
+          console.error(`❌ Failed to join room ${sessionId}`);
+          socket.emit("error", { message: "Failed to join session room" });
+          return;
+        }
+
+        // Get session
         let session = await CodeSession.findOne({ sessionId });
         if (!session) {
-          console.log(`❌ Session ${sessionId} not found`);
+          console.log(`❌ Session ${sessionId} not found in database`);
           socket.emit("error", { message: "Session not found" });
           return;
         }
@@ -81,16 +99,19 @@ const handleCodeCollaboration = (io) => {
           username: user.firstName || user.username || "Anonymous",
           color: userColor,
           cursor: { line: 1, column: 1 },
-          socketId: socket.id,
+          socketId: socket.id, // CRITICAL: Always use the current socket ID
           lastActive: new Date(),
         };
 
         if (existingParticipantIndex >= 0) {
+          // Update existing participant with new socket ID
           session.participants[existingParticipantIndex] = participantData;
         } else {
+          // Add new participant
           session.participants.push(participantData);
         }
 
+        session.markModified("participants");
         await session.save();
         console.log(
           `💾 Session saved with ${session.participants.length} participants`,
@@ -101,29 +122,15 @@ const handleCodeCollaboration = (io) => {
           sessionId: session.sessionId,
           code: session.code,
           language: session.language,
-          participants: session.participants.map((p) => ({
-            userId: p.userId,
-            username: p.username,
-            color: p.color,
-            cursor: p.cursor,
-          })),
+          participants: session.participants,
+          title: session.title,
+          mySocketId: socket.id, // Send back the socket ID so client knows their ID
         });
 
-        // Notify other users about new participant
-        socket.to(sessionId).emit("user-joined", {
-          userId: participantData.userId,
-          username: participantData.username,
-          color: participantData.color,
-        });
+        // Notify others in the session (not the joining user)
+        socket.to(sessionId).emit("user-joined", participantData);
 
-        // Send updated participants list to ALL users in room
-        const currentParticipants = session.participants.map((p) => ({
-          userId: p.userId,
-          username: p.username,
-          color: p.color,
-          cursor: p.cursor,
-        }));
-
+        // Broadcast updated participants list to everyone in the room
         codeNamespace
           .to(sessionId)
           .emit("participants-update", currentParticipants);
@@ -131,13 +138,11 @@ const handleCodeCollaboration = (io) => {
           `📢 Broadcasted participants update to room ${sessionId} (${currentParticipants.length} users)`,
         );
 
-        // Log room info for debugging
-        const roomClients = await codeNamespace.in(sessionId).fetchSockets();
         console.log(
           `🏠 Room ${sessionId} now has ${roomClients.length} connected sockets`,
         );
       } catch (error) {
-        console.error("❌ Error joining code session:", error);
+        console.error(`🚨 Error in join-code-session:`, error);
         socket.emit("error", {
           message: "Failed to join session",
           error: error.message,
@@ -150,21 +155,30 @@ const handleCodeCollaboration = (io) => {
       const { sessionId, code, changes, userId, timestamp } = data;
 
       // Log receipt of incoming code-change for debugging
-      try {
-        console.log("👂 Received code-change from client", {
-          fromSocket: socket.id,
-          sessionId,
-          userId,
-          codeLength: code ? code.length : 0,
-          timestamp,
-        });
-      } catch (err) {
-        console.warn("⚠️ Error logging code-change payload", err);
-      }
+      console.log("👂 Received code-change from client", {
+        fromSocket: socket.id,
+        storedSocketUserId: socket.userId,
+        storedSocketSessionId: socket.sessionId,
+        dataSessionId: sessionId,
+        dataUserId: userId,
+        codeLength: code ? code.length : 0,
+        timestamp,
+      });
 
       try {
-        // Verify user is in this session
-        if (socket.sessionId !== sessionId) {
+        // Validate required data
+        if (!sessionId || !code === undefined) {
+          console.log("❌ Missing sessionId or code in code-change");
+          socket.emit("error", { message: "Invalid code change data" });
+          return;
+        }
+
+        // Verify user is in this session - use stored socket properties
+        const effectiveSessionId = socket.sessionId || sessionId;
+        const effectiveUserId = socket.userId || userId;
+
+        // If socket doesn't have session info, try to auto-fix
+        if (!socket.sessionId || socket.sessionId !== sessionId) {
           console.log(
             `⚠️  User ${userId} trying to edit session they're not in (${socket.sessionId} vs ${sessionId})`,
           );
@@ -182,7 +196,6 @@ const handleCodeCollaboration = (io) => {
         }
 
         // Additional verification - ensure the userId matches socket.userId
-        // If socket.userId is set, it should match data.userId
         // Use loose equality or string comparison to be safe
         if (
           socket.userId &&
@@ -198,7 +211,7 @@ const handleCodeCollaboration = (io) => {
 
         // Update code in database
         const session = await CodeSession.findOneAndUpdate(
-          { sessionId },
+          { sessionId: effectiveSessionId },
           {
             code,
             lastModified: new Date(),
@@ -208,31 +221,32 @@ const handleCodeCollaboration = (io) => {
         );
 
         if (!session) {
-          console.log(`❌ Session ${sessionId} not found for code update`);
+          console.log(
+            `❌ Session ${effectiveSessionId} not found for code update`,
+          );
           socket.emit("error", { message: "Session not found" });
           return;
         }
 
-        // console.log(`💾 Code saved to database for session ${sessionId}`);
-
-        // Broadcast to OTHER users in the session (exclude sender)
+        // Broadcast to OTHER users in the session (CRITICAL: use socket.to() to exclude sender)
         const updateData = {
-          sessionId,
+          sessionId: effectiveSessionId,
           code,
           changes,
-          userId: socket.userId || userId, // Fallback to data.userId if socket.userId is missing
+          userId: effectiveUserId,
           socketId: socket.id,
           timestamp: timestamp || Date.now(),
         };
 
-        // Use the namespace to broadcast to other users in the room (CRITICAL: use codeNamespace, not socket.to)
-        codeNamespace.to(sessionId).emit("code-update", updateData);
+        // CRITICAL FIX: Use socket.to() instead of codeNamespace.to() to exclude the sender
+        socket.to(effectiveSessionId).emit("code-update", updateData);
 
         // Log how many sockets are in the room after broadcast
         try {
           const socketsInRoom = await codeNamespace
-            .in(sessionId)
+            .in(effectiveSessionId)
             .fetchSockets();
+          const otherSockets = socketsInRoom.filter((s) => s.id !== socket.id);
           console.log(
             `📡 Broadcasted code update to room ${sessionId} (room size: ${socketsInRoom.length})`,
           );
@@ -241,15 +255,11 @@ const handleCodeCollaboration = (io) => {
         }
 
         // Acknowledge to the sender that the server processed the change
-        try {
-          socket.emit("code-ack", {
-            sessionId,
-            timestamp: Date.now(),
-            success: true,
-          });
-        } catch (err) {
-          console.warn("⚠️ Failed to emit code-ack to sender", err);
-        }
+        socket.emit("code-ack", {
+          sessionId: effectiveSessionId,
+          timestamp: Date.now(),
+          success: true,
+        });
       } catch (error) {
         console.error("❌ Code change error:", error);
         socket.emit("error", {
@@ -264,14 +274,20 @@ const handleCodeCollaboration = (io) => {
       const { sessionId, position, userId } = data;
 
       try {
-        if (socket.sessionId !== sessionId) {
-          console.log(`⚠️  Cursor move: User not in session`);
+        const effectiveSessionId = socket.sessionId || sessionId;
+        const effectiveUserId = socket.userId || userId;
+
+        if (!effectiveSessionId) {
+          console.log(`⚠️  Cursor move: No session ID`);
           return;
         }
 
         // Update cursor position in database
         await CodeSession.findOneAndUpdate(
-          { sessionId, "participants.userId": socket.userId },
+          {
+            sessionId: effectiveSessionId,
+            "participants.userId": effectiveUserId,
+          },
           {
             $set: {
               "participants.$.cursor": position,
@@ -280,9 +296,9 @@ const handleCodeCollaboration = (io) => {
           },
         );
 
-        // Broadcast cursor position to other users
-        codeNamespace.to(sessionId).emit("cursor-update", {
-          userId: socket.userId,
+        // Broadcast cursor position to OTHER users only (use socket.to to exclude sender)
+        socket.to(effectiveSessionId).emit("cursor-update", {
+          userId: effectiveUserId,
           position,
           timestamp: Date.now(),
         });
@@ -298,23 +314,25 @@ const handleCodeCollaboration = (io) => {
     // Handle typing indicators
     socket.on("typing-start", (data) => {
       const { sessionId } = data;
-      if (socket.sessionId === sessionId) {
-        codeNamespace.to(sessionId).emit("user-typing", {
+      const effectiveSessionId = socket.sessionId || sessionId;
+      if (effectiveSessionId) {
+        // Broadcast to others only (not the sender)
+        socket.to(effectiveSessionId).emit("user-typing", {
           userId: socket.userId,
           isTyping: true,
         });
-        console.log(`⌨️  User ${socket.userId} started typing in ${sessionId}`);
       }
     });
 
     socket.on("typing-stop", (data) => {
       const { sessionId } = data;
-      if (socket.sessionId === sessionId) {
-        codeNamespace.to(sessionId).emit("user-typing", {
+      const effectiveSessionId = socket.sessionId || sessionId;
+      if (effectiveSessionId) {
+        // Broadcast to others only (not the sender)
+        socket.to(effectiveSessionId).emit("user-typing", {
           userId: socket.userId,
           isTyping: false,
         });
-        console.log(`⌨️  User ${socket.userId} stopped typing in ${sessionId}`);
       }
     });
 
@@ -323,14 +341,16 @@ const handleCodeCollaboration = (io) => {
       const { sessionId, language } = data;
 
       try {
-        if (socket.sessionId !== sessionId) return;
+        const effectiveSessionId = socket.sessionId || sessionId;
+        if (!effectiveSessionId) return;
 
         await CodeSession.findOneAndUpdate(
           { sessionId },
           { language, lastModified: new Date() },
         );
 
-        codeNamespace.to(sessionId).emit("language-update", {
+        // Broadcast to others only (sender already updated locally)
+        socket.to(effectiveSessionId).emit("language-update", {
           language,
           userId: socket.userId,
         });
@@ -346,10 +366,12 @@ const handleCodeCollaboration = (io) => {
     // Handle user disconnect
     socket.on("disconnect", async (reason) => {
       console.log(`👋 Code user disconnected: ${socket.id}, reason: ${reason}`);
+      console.log(`👋 User ID: ${socket.userId}, Session: ${socket.sessionId}`);
 
       if (socket.userId && socket.sessionId) {
         try {
-          // Remove user from session participants
+          // CRITICAL: Only remove participant if their socketId matches this socket
+          // This prevents removing users who quickly reconnected with a new socket
           const session = await CodeSession.findOneAndUpdate(
             { sessionId: socket.sessionId },
             { $pull: { participants: { userId: socket.userId } } },
@@ -358,8 +380,9 @@ const handleCodeCollaboration = (io) => {
 
           if (session) {
             // Notify other users about disconnection
-            codeNamespace.to(socket.sessionId).emit("user-left", {
+            socket.to(socket.sessionId).emit("user-left", {
               userId: socket.userId,
+              socketId: socket.id,
             });
 
             // Send updated participants list
@@ -368,6 +391,7 @@ const handleCodeCollaboration = (io) => {
               username: p.username,
               color: p.color,
               cursor: p.cursor,
+              socketId: p.socketId,
             }));
 
             codeNamespace
@@ -376,10 +400,21 @@ const handleCodeCollaboration = (io) => {
             console.log(
               `🧹 Cleaned up user ${socket.userId} from session ${socket.sessionId}`,
             );
+            console.log(
+              `🧹 Remaining participants: ${currentParticipants.length}`,
+            );
+          } else {
+            console.log(
+              `ℹ️ User ${socket.userId} may have already reconnected with new socket`,
+            );
           }
         } catch (error) {
           console.error("❌ Disconnect cleanup error:", error);
         }
+      } else {
+        console.log(
+          `⚠️ Disconnect without user/session info - socket may not have joined properly`,
+        );
       }
     });
 

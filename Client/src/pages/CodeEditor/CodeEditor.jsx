@@ -39,12 +39,13 @@ const CodeEditor = () => {
 
   // Socket and connection states
   const [codeSocket, setCodeSocket] = useState(null);
-  const isConnected = codeConnectionState === "connected";
+  const [socketConnected, setSocketConnected] = useState(false);
+  const isConnected = socketConnected && codeConnectionState === "connected";
 
   // Session and editor states
   const [sessionData, setSessionData] = useState(null);
   const [code, setCode] = useState(
-    '// Welcome to Communiatec Code Collaboration\n// Start coding together!\nconsole.log("Hello, World!");'
+    '// Welcome to Communiatec Code Collaboration\n// Start coding together!\nconsole.log("Hello, World!");',
   );
   const [language, setLanguage] = useState("javascript");
   const [participants, setParticipants] = useState([]);
@@ -82,6 +83,16 @@ const CodeEditor = () => {
     }
   }, [userInfo, sessionId]);
 
+  // Update socket state when connection state changes to force re-render
+  useEffect(() => {
+    if (codeSocket) {
+      console.log("🔄 Connection state changed:", codeConnectionState);
+      console.log("🔄 Socket.connected:", codeSocket.connected);
+      // Update connected state based on actual socket
+      setSocketConnected(codeSocket.connected);
+    }
+  }, [codeConnectionState, codeSocket]);
+
   const setupCodeSocketEvents = (socket) => {
     // Remove any existing listeners to prevent duplicates
     socket.off("session-joined");
@@ -95,11 +106,43 @@ const CodeEditor = () => {
     socket.off("language-update");
     socket.off("pong");
     socket.off("code-ack");
+    socket.off("connect");
+    socket.off("disconnect");
+
+    // Monitor socket connection state changes
+    const onConnect = () => {
+      console.log("✅ Code socket connected event received in component");
+      console.log("✅ Socket.connected:", socket.connected);
+      // Update connection state
+      setSocketConnected(true);
+    };
+
+    if (socket.connected) {
+      onConnect();
+    } else {
+      socket.on("connect", onConnect);
+    }
+
+    socket.on("disconnect", (reason) => {
+      console.log("❌ Code socket disconnected in component:", reason);
+      // Update connection state
+      setSocketConnected(false);
+      sessionJoinedRef.current = false;
+    });
+
+    // Track our own socket ID for filtering updates
+    let mySocketId = socket.id;
 
     // Session events
     socket.on("session-joined", (data) => {
       console.log("🎯 Successfully joined session:", data);
       console.log("📝 Received code length:", data.code?.length);
+      console.log("🔑 My socket ID from server:", data.mySocketId);
+      
+      // Store our socket ID from server response for reliable filtering
+      if (data.mySocketId) {
+        mySocketId = data.mySocketId;
+      }
 
       isUpdatingFromRemote.current = true;
       setCode(data.code || "");
@@ -123,15 +166,23 @@ const CodeEditor = () => {
 
     // Real-time collaboration events
     socket.on("code-update", (data) => {
-      console.log("📝 Received code update from user:", data.userId);
-      console.log("📝 New code length:", data.code?.length);
-      console.log("📝 Current user ID:", currentUserId);
-      console.log("📝 Sender socket ID:", data.socketId);
-      console.log("📝 My socket ID:", socket.id);
+      console.log("📝 Received code update:", {
+        fromUserId: data.userId,
+        fromSocketId: data.socketId,
+        myUserId: currentUserId,
+        mySocketId: mySocketId,
+        socketId: socket.id,
+        codeLength: data.code?.length,
+      });
 
-      // Only apply if it's not from current user
-      if (data.userId !== currentUserId && data.socketId !== socket.id) {
-        console.log("✅ Applying remote code update");
+      // CRITICAL: Server now uses socket.to() so we should NOT receive our own updates
+      // But keep the filter as a safety measure
+      const isFromMe = 
+        (data.userId && currentUserId && data.userId.toString() === currentUserId.toString()) ||
+        (data.socketId && (data.socketId === mySocketId || data.socketId === socket.id));
+
+      if (!isFromMe) {
+        console.log("✅ Applying remote code update from another user");
         isUpdatingFromRemote.current = true;
         lastRemoteUpdate.current = data.timestamp || Date.now();
         setCode(data.code || "");
@@ -140,7 +191,8 @@ const CodeEditor = () => {
           isUpdatingFromRemote.current = false;
         }, 200);
       } else {
-        console.log("⏭️ Skipping own code update");
+        // This should rarely happen now that server uses socket.to()
+        console.log("⏭️ Skipping own code update (shouldn't happen with server fix)");
       }
     });
 
@@ -162,8 +214,8 @@ const CodeEditor = () => {
     socket.on("cursor-update", (data) => {
       setParticipants((prev) =>
         prev.map((p) =>
-          p.userId === data.userId ? { ...p, cursor: data.position } : p
-        )
+          p.userId === data.userId ? { ...p, cursor: data.position } : p,
+        ),
       );
     });
 
@@ -281,7 +333,7 @@ const CodeEditor = () => {
 
     // Don't use aggressive timestamp checking - it blocks too many legitimate updates
     // Just emit the change immediately
-    
+
     // Ensure we've joined the session room on the server before emitting
     if (!sessionJoinedRef.current) {
       console.warn("⚠️ Not joined to session yet - skipping emit");
@@ -290,8 +342,10 @@ const CodeEditor = () => {
 
     setCode(newCode);
 
-    // Emit to code socket
-    if (isConnected && sessionId) {
+    // Emit to code socket - check connection state
+    const canEmit = isConnected && sessionId && sessionJoinedRef.current;
+
+    if (canEmit) {
       console.log("📡 Emitting code change to server");
 
       const success = emitCode("code-change", {
@@ -320,13 +374,15 @@ const CodeEditor = () => {
       }, 2000);
     } else {
       console.log("⚠️ Cannot emit code change - not connected or no session");
-      console.log("⚠️ Connected:", isConnected);
+      console.log("⚠️ Socket connected:", socketConnected);
+      console.log("⚠️ Connection state:", codeConnectionState);
       console.log("⚠️ Session ID:", sessionId);
+      console.log("⚠️ Session joined:", sessionJoinedRef.current);
     }
   };
 
   const handleCursorChange = (position) => {
-    if (isConnected && sessionId) {
+    if (isConnected && sessionId && sessionJoinedRef.current) {
       emitCode("cursor-move", {
         sessionId,
         position,
@@ -338,7 +394,7 @@ const CodeEditor = () => {
   const handleLanguageChange = (newLanguage) => {
     setLanguage(newLanguage);
 
-    if (isConnected && sessionId) {
+    if (isConnected && sessionId && sessionJoinedRef.current) {
       emitCode("language-change", {
         sessionId,
         language: newLanguage,
@@ -926,7 +982,7 @@ const CodeEditor = () => {
             </div>
 
             {/* Debug Info (Remove in production) */}
-            {process.env.NODE_ENV === "development" && (
+            {import.meta.env.MODE === "development" && (
               <div className="bg-amber-950/20 backdrop-blur-md rounded-xl p-4 border border-amber-500/20 shadow-lg relative overflow-hidden">
                 {/* Ambient background glow */}
                 <div className="absolute inset-0 overflow-hidden">
@@ -967,7 +1023,7 @@ const CodeEditor = () => {
                               hour: "2-digit",
                               minute: "2-digit",
                               second: "2-digit",
-                            }
+                            },
                           )
                         : "N/A"}
                     </span>
