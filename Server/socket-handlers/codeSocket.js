@@ -117,12 +117,21 @@ const handleCodeCollaboration = (io) => {
           `💾 Session saved with ${session.participants.length} participants`,
         );
 
+        // 🔧 FIX: Prepare current participants list
+        const currentParticipants = session.participants.map((p) => ({
+          userId: p.userId,
+          username: p.username,
+          color: p.color,
+          cursor: p.cursor,
+          socketId: p.socketId,
+        }));
+
         // Send current session data to joining user
         socket.emit("session-joined", {
           sessionId: session.sessionId,
           code: session.code,
           language: session.language,
-          participants: session.participants,
+          participants: currentParticipants,
           title: session.title,
           mySocketId: socket.id, // Send back the socket ID so client knows their ID
         });
@@ -138,8 +147,10 @@ const handleCodeCollaboration = (io) => {
           `📢 Broadcasted participants update to room ${sessionId} (${currentParticipants.length} users)`,
         );
 
+        // 🔧 FIX: Get actual room client count
+        const socketsInRoom = await codeNamespace.in(sessionId).fetchSockets();
         console.log(
-          `🏠 Room ${sessionId} now has ${roomClients.length} connected sockets`,
+          `🏠 Room ${sessionId} now has ${socketsInRoom.length} connected sockets`,
         );
       } catch (error) {
         console.error(`🚨 Error in join-code-session:`, error);
@@ -167,7 +178,7 @@ const handleCodeCollaboration = (io) => {
 
       try {
         // Validate required data
-        if (!sessionId || !code === undefined) {
+        if (!sessionId || code === undefined) {
           console.log("❌ Missing sessionId or code in code-change");
           socket.emit("error", { message: "Invalid code change data" });
           return;
@@ -186,27 +197,13 @@ const handleCodeCollaboration = (io) => {
           if (sessionId) {
             socket.sessionId = sessionId;
             socket.userId = userId;
-            socket.join(sessionId);
+            await socket.join(sessionId);
             console.log(
               `🔧 Auto-fixed socket session/user ID for ${socket.id}`,
             );
           } else {
             return;
           }
-        }
-
-        // Additional verification - ensure the userId matches socket.userId
-        // Use loose equality or string comparison to be safe
-        if (
-          socket.userId &&
-          userId &&
-          socket.userId.toString() !== userId.toString()
-        ) {
-          console.log(
-            `⚠️  UserId mismatch: socket.userId=${socket.userId}, data.userId=${userId}`,
-          );
-          // Don't return here, just log warning. Trust the socket connection for now if session matches.
-          // return;
         }
 
         // Update code in database
@@ -241,18 +238,14 @@ const handleCodeCollaboration = (io) => {
         // CRITICAL FIX: Use socket.to() instead of codeNamespace.to() to exclude the sender
         socket.to(effectiveSessionId).emit("code-update", updateData);
 
-        // Log how many sockets are in the room after broadcast
-        try {
-          const socketsInRoom = await codeNamespace
-            .in(effectiveSessionId)
-            .fetchSockets();
-          const otherSockets = socketsInRoom.filter((s) => s.id !== socket.id);
-          console.log(
-            `📡 Broadcasted code update to room ${sessionId} (room size: ${socketsInRoom.length})`,
-          );
-        } catch (err) {
-          console.warn("⚠️ Failed to fetch room sockets for logging", err);
-        }
+        // Log how many sockets received the broadcast
+        const socketsInRoom = await codeNamespace
+          .in(effectiveSessionId)
+          .fetchSockets();
+        const otherSockets = socketsInRoom.filter((s) => s.id !== socket.id);
+        console.log(
+          `📡 Broadcasted code update to ${otherSockets.length} other socket(s) in room ${sessionId}`,
+        );
 
         // Acknowledge to the sender that the server processed the change
         socket.emit("code-ack", {
@@ -302,10 +295,6 @@ const handleCodeCollaboration = (io) => {
           position,
           timestamp: Date.now(),
         });
-
-        console.log(
-          `👆 Cursor update from ${socket.userId}: Line ${position.line}, Col ${position.column}`,
-        );
       } catch (error) {
         console.error("❌ Cursor move error:", error);
       }
@@ -345,7 +334,7 @@ const handleCodeCollaboration = (io) => {
         if (!effectiveSessionId) return;
 
         await CodeSession.findOneAndUpdate(
-          { sessionId },
+          { sessionId: effectiveSessionId },
           { language, lastModified: new Date() },
         );
 
@@ -356,7 +345,7 @@ const handleCodeCollaboration = (io) => {
         });
 
         console.log(
-          `🔤 Language changed to ${language} in session ${sessionId}`,
+          `🔤 Language changed to ${language} in session ${effectiveSessionId}`,
         );
       } catch (error) {
         console.error("❌ Language change error:", error);
@@ -370,11 +359,20 @@ const handleCodeCollaboration = (io) => {
 
       if (socket.userId && socket.sessionId) {
         try {
-          // CRITICAL: Only remove participant if their socketId matches this socket
+          // 🔧 FIX: Only remove participant if their socketId matches this socket
           // This prevents removing users who quickly reconnected with a new socket
           const session = await CodeSession.findOneAndUpdate(
-            { sessionId: socket.sessionId },
-            { $pull: { participants: { userId: socket.userId } } },
+            {
+              sessionId: socket.sessionId,
+              "participants.socketId": socket.id, // Only remove if socket ID matches
+            },
+            {
+              $pull: {
+                participants: {
+                  socketId: socket.id, // Match by socket ID, not user ID
+                },
+              },
+            },
             { new: true },
           );
 
@@ -428,11 +426,12 @@ const handleCodeCollaboration = (io) => {
 
           await CodeSession.findOneAndUpdate(
             { sessionId },
-            { $pull: { participants: { userId: socket.userId } } },
+            { $pull: { participants: { socketId: socket.id } } },
           );
 
           socket.to(sessionId).emit("user-left", {
             userId: socket.userId,
+            socketId: socket.id,
           });
 
           console.log(

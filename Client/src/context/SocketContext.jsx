@@ -228,7 +228,7 @@ export const SocketProvider = ({ children }) => {
           const dateStr = event?.start
             ? format(parseISO(event.start), "PP")
             : "";
-          toast.success(`📅 ${title} – ${dateStr}`, { duration: 3000 });
+          toast.success(`📅 ${title} — ${dateStr}`, { duration: 3000 });
         } catch (error) {
           console.error("Error handling calendar event creation:", error);
         }
@@ -358,7 +358,9 @@ export const SocketProvider = ({ children }) => {
         console.log("♻️ Reusing existing code socket for session:", sessionId);
         return codeSocket.current;
       }
-      console.log("🧹 Disconnecting existing code socket for different session...");
+      console.log(
+        "🧹 Disconnecting existing code socket for different session...",
+      );
       codeSocket.current.disconnect();
       codeSocket.current = null;
     }
@@ -400,10 +402,14 @@ export const SocketProvider = ({ children }) => {
     // Store session ID on socket instance for reference
     codeSocketInstance.sessionId = sessionId;
 
+    // 🔧 FIX: Track connection state properly
+    let isConnecting = true;
+
     // Connection events
     const onConnect = () => {
       console.log("✅ Connected to code collaboration server");
       console.log("✅ Socket ID:", codeSocketInstance.id);
+      isConnecting = false;
       setCodeConnectionState("connected");
 
       // Auto-join session on connect
@@ -422,17 +428,20 @@ export const SocketProvider = ({ children }) => {
 
     codeSocketInstance.on("disconnect", (reason) => {
       console.log("❌ Code socket disconnected:", reason);
+      isConnecting = false;
       setCodeConnectionState("disconnected");
     });
 
     codeSocketInstance.on("connect_error", (error) => {
       console.error("🚨 Code socket connection error:", error.message);
+      isConnecting = false;
       setCodeConnectionState("error");
     });
 
     codeSocketInstance.on("reconnect", (attemptNumber) => {
       console.log(`✅ Code socket reconnected after ${attemptNumber} attempts`);
       console.log("✅ New Socket ID after reconnect:", codeSocketInstance.id);
+      isConnecting = false;
       setCodeConnectionState("connected");
 
       // Rejoin session on reconnect with fresh socket
@@ -450,6 +459,9 @@ export const SocketProvider = ({ children }) => {
       console.log(`🔄 Code socket reconnection attempt ${attemptNumber}...`);
       setCodeConnectionState("reconnecting");
     });
+
+    // 🔧 FIX: Set connecting state immediately
+    setCodeConnectionState("connecting");
 
     codeSocket.current = codeSocketInstance;
     return codeSocketInstance;
