@@ -412,12 +412,20 @@ export const SocketProvider = ({ children }) => {
       isConnecting = false;
       setCodeConnectionState("connected");
 
-      // Auto-join session on connect
-      console.log(`🎯 Auto-joining session: ${sessionId}`);
-      codeSocketInstance.emit("join-code-session", {
-        sessionId,
-        user: userInfo,
-      });
+      // CRITICAL FIX: Use setTimeout to ensure socket is fully ready before emitting
+      setTimeout(() => {
+        if (codeSocketInstance.connected) {
+          console.log(`🎯 Auto-joining session: ${sessionId}`);
+          codeSocketInstance.emit("join-code-session", {
+            sessionId,
+            user: userInfo,
+          });
+        } else {
+          console.error(
+            "❌ Socket disconnected before join-code-session could be emitted",
+          );
+        }
+      }, 100);
     };
 
     if (codeSocketInstance.connected) {
@@ -444,15 +452,25 @@ export const SocketProvider = ({ children }) => {
       isConnecting = false;
       setCodeConnectionState("connected");
 
-      // Rejoin session on reconnect with fresh socket
-      codeSocketInstance.emit("join-code-session", {
-        sessionId,
-        user: userInfo,
-      });
+      // CRITICAL FIX: Wait for socket to stabilize before rejoining
+      setTimeout(() => {
+        if (codeSocketInstance.connected) {
+          // Rejoin session on reconnect with fresh socket
+          console.log(`🔄 Rejoining session after reconnect: ${sessionId}`);
+          codeSocketInstance.emit("join-code-session", {
+            sessionId,
+            user: userInfo,
+          });
 
-      // CRITICAL FIX: Fetch latest session state after reconnection
-      console.log("🔄 Fetching latest session state after reconnection...");
-      codeSocketInstance.emit("get-session-info", { sessionId });
+          // CRITICAL FIX: Fetch latest session state after reconnection
+          setTimeout(() => {
+            console.log(
+              "🔄 Fetching latest session state after reconnection...",
+            );
+            codeSocketInstance.emit("get-session-info", { sessionId });
+          }, 500);
+        }
+      }, 200);
     });
 
     codeSocketInstance.on("reconnect_attempt", (attemptNumber) => {

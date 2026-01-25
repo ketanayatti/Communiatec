@@ -9,6 +9,9 @@ const handleCodeCollaboration = (io) => {
 
   codeNamespace.on("connection", (socket) => {
     console.log(`🔌 Code collaboration user connected: ${socket.id}`);
+    console.log(
+      `🔍 Connection details - IP: ${socket.handshake.address}, User-Agent: ${socket.handshake.headers["user-agent"]?.substring(0, 50)}`,
+    );
 
     // Join code session
     socket.on("join-code-session", async (data) => {

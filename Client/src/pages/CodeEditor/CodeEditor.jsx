@@ -115,6 +115,11 @@ const CodeEditor = () => {
       console.log("✅ Socket.connected:", socket.connected);
       // Update connection state
       setSocketConnected(true);
+
+      // Show reconnection success if this isn't the initial connection
+      if (sessionJoinedRef.current) {
+        toast.success("Reconnected to collaboration session!");
+      }
     };
 
     if (socket.connected) {
@@ -128,6 +133,15 @@ const CodeEditor = () => {
       // Update connection state
       setSocketConnected(false);
       sessionJoinedRef.current = false;
+
+      // Show user-friendly message based on disconnect reason
+      if (reason === "io server disconnect") {
+        toast.error(
+          "Disconnected from server. Your changes may not be synced.",
+        );
+      } else if (reason === "transport close" || reason === "transport error") {
+        toast.warning("Connection interrupted. Attempting to reconnect...");
+      }
     });
 
     // Track our own socket ID for filtering updates
@@ -138,7 +152,7 @@ const CodeEditor = () => {
       console.log("🎯 Successfully joined session:", data);
       console.log("📝 Received code length:", data.code?.length);
       console.log("🔑 My socket ID from server:", data.mySocketId);
-      
+
       // Store our socket ID from server response for reliable filtering
       if (data.mySocketId) {
         mySocketId = data.mySocketId;
@@ -161,7 +175,18 @@ const CodeEditor = () => {
 
     socket.on("error", (error) => {
       console.error("❌ Session error:", error);
-      toast.error(error.message || "Session error occurred");
+      const errorMsg = error.message || "Session error occurred";
+      toast.error(errorMsg);
+
+      // Additional error handling based on error type
+      if (errorMsg.includes("Session not found")) {
+        console.error("Session does not exist. Redirecting...");
+        setTimeout(() => {
+          navigate("/code-editor");
+        }, 2000);
+      } else if (errorMsg.includes("Failed to join")) {
+        sessionJoinedRef.current = false;
+      }
     });
 
     // Real-time collaboration events
@@ -177,9 +202,12 @@ const CodeEditor = () => {
 
       // CRITICAL: Server now uses socket.to() so we should NOT receive our own updates
       // But keep the filter as a safety measure
-      const isFromMe = 
-        (data.userId && currentUserId && data.userId.toString() === currentUserId.toString()) ||
-        (data.socketId && (data.socketId === mySocketId || data.socketId === socket.id));
+      const isFromMe =
+        (data.userId &&
+          currentUserId &&
+          data.userId.toString() === currentUserId.toString()) ||
+        (data.socketId &&
+          (data.socketId === mySocketId || data.socketId === socket.id));
 
       if (!isFromMe) {
         console.log("✅ Applying remote code update from another user");
@@ -192,7 +220,9 @@ const CodeEditor = () => {
         }, 200);
       } else {
         // This should rarely happen now that server uses socket.to()
-        console.log("⏭️ Skipping own code update (shouldn't happen with server fix)");
+        console.log(
+          "⏭️ Skipping own code update (shouldn't happen with server fix)",
+        );
       }
     });
 

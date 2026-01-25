@@ -132,16 +132,16 @@ app.use((req, res, next) => {
     // Never use * when credentials are enabled
     res.header(
       "Access-Control-Allow-Origin",
-      origin || "http://localhost:5173"
+      origin || "http://localhost:5173",
     );
     res.header("Vary", "Origin");
     res.header(
       "Access-Control-Allow-Methods",
-      "GET, POST, PUT, DELETE, OPTIONS"
+      "GET, POST, PUT, DELETE, OPTIONS",
     );
     res.header(
       "Access-Control-Allow-Headers",
-      "Content-Type, Authorization, X-Requested-With, Accept, Cookie, Set-Cookie, Origin"
+      "Content-Type, Authorization, X-Requested-With, Accept, Cookie, Set-Cookie, Origin",
     );
     res.header("Access-Control-Allow-Credentials", "true");
     res.header("Access-Control-Expose-Headers", "Set-Cookie");
@@ -160,7 +160,7 @@ app.use(
   helmet({
     contentSecurityPolicy: false, // We'll handle CSP in our custom middleware
     crossOriginEmbedderPolicy: false,
-  })
+  }),
 );
 
 // Input sanitization and validation
@@ -199,7 +199,7 @@ app.use("/api/auth/linkedin", authLimiter);
 // Static file serving
 app.use(
   "/uploads/profile-images",
-  express.static(path.join(__dirname, "uploads/profile-images"))
+  express.static(path.join(__dirname, "uploads/profile-images")),
 );
 
 // Maintenance status endpoint (must be before maintenance middleware)
@@ -260,7 +260,7 @@ app.use("/api/groups", checkSessionSecurity, groupRoutes); // Add session securi
 app.use("/api/gemini", require("./routes/geminiRoutes"));
 app.use(
   "/api/message-suggestions",
-  require("./routes/messageSuggestionRoutes")
+  require("./routes/messageSuggestionRoutes"),
 );
 app.use("/api/ai-suggestions", require("./routes/aiSuggestionRoutes"));
 app.use("/api/zoro", require("./routes/zoroRoutes"));
@@ -407,42 +407,27 @@ try {
 
 // ✨ FIXED: Setup Code Collaboration Socket on /code namespace
 try {
+  // handleCodeCollaboration sets up its own connection handlers internally
   const codeNamespace = handleCodeCollaboration(io);
   console.log(
-    "✅ Code collaboration socket handlers initialized on /code namespace"
+    "✅ Code collaboration socket handlers initialized on /code namespace",
   );
-
-  // Monitor code namespace connections
-  codeNamespace.on("connection", (socket) => {
-    console.log(
-      `👤 Code client connected: ${socket.id} from ${socket.handshake.address}`
-    );
-
-    socket.on("disconnect", (reason) => {
-      console.log(
-        `👋 Code client disconnected: ${socket.id}, reason: ${reason}`
-      );
-    });
-
-    socket.on("error", (error) => {
-      console.error(`🚨 Code socket error for ${socket.id}:`, error);
-    });
-  });
 
   // Setup Coffee Break Socket
   const handleCoffeeBreakSocket = require("./socket-handlers/coffeeBreakSocket");
   const coffeeBreakNamespace = handleCoffeeBreakSocket(io);
   console.log(
-    "✅ Coffee break socket handlers initialized on /coffee-break namespace"
+    "✅ Coffee break socket handlers initialized on /coffee-break namespace",
   );
 } catch (error) {
   console.error("❌ Failed to initialize code collaboration:", error.message);
+  console.error(error.stack);
 }
 
 // ✨ ENHANCED: Connection monitoring for MAIN namespace only
 io.on("connection", (socket) => {
   console.log(
-    `👤 Chat client connected: ${socket.id} from ${socket.handshake.address}`
+    `👤 Chat client connected: ${socket.id} from ${socket.handshake.address}`,
   );
 
   socket.on("disconnect", (reason) => {
@@ -483,26 +468,30 @@ const startServer = async () => {
       console.log("🏃‍♂️ Starting server keepalive mechanism...");
 
       // Self-ping every 10 minutes to prevent sleep (Render sleeps after 15 minutes)
-      const keepAliveInterval = setInterval(() => {
-        const serverUrl = process.env.SERVER_URL || `http://localhost:${PORT}`;
+      const keepAliveInterval = setInterval(
+        () => {
+          const serverUrl =
+            process.env.SERVER_URL || `http://localhost:${PORT}`;
 
-        // Use native http to ping our own server (no dependencies required)
-        http
-          .get(`${serverUrl}/api/keepalive`, (res) => {
-            // Consume response data to free up memory
-            res.resume();
-            if (res.statusCode === 200) {
-              console.log("✅ Keepalive ping successful");
-            } else {
-              console.log(
-                `⚠️ Keepalive ping returned status: ${res.statusCode}`
-              );
-            }
-          })
-          .on("error", (error) => {
-            console.log("⚠️ Keepalive ping failed:", error.message);
-          });
-      }, 10 * 60 * 1000); // 10 minutes
+          // Use native http to ping our own server (no dependencies required)
+          http
+            .get(`${serverUrl}/api/keepalive`, (res) => {
+              // Consume response data to free up memory
+              res.resume();
+              if (res.statusCode === 200) {
+                console.log("✅ Keepalive ping successful");
+              } else {
+                console.log(
+                  `⚠️ Keepalive ping returned status: ${res.statusCode}`,
+                );
+              }
+            })
+            .on("error", (error) => {
+              console.log("⚠️ Keepalive ping failed:", error.message);
+            });
+        },
+        10 * 60 * 1000,
+      ); // 10 minutes
 
       // Clear interval on server shutdown
       process.on("SIGTERM", () => {
