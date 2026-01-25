@@ -413,6 +413,7 @@ export const SocketProvider = ({ children }) => {
     const onConnect = () => {
       console.log("✅ Connected to code collaboration server");
       console.log("✅ Socket ID:", codeSocketInstance.id);
+      console.log("✅ Socket.connected:", codeSocketInstance.connected);
       isConnecting = false;
       setCodeConnectionState("connected");
 
@@ -430,10 +431,17 @@ export const SocketProvider = ({ children }) => {
     // Set up connection handler BEFORE checking if connected
     codeSocketInstance.on("connect", onConnect);
 
-    // If already connected when we set up the handler, call it manually
-    if (codeSocketInstance.connected) {
-      onConnect();
-    }
+    // CRITICAL: Check connection status after a brief delay to ensure socket is initialized
+    setTimeout(() => {
+      console.log("🔍 Checking socket connection status...");
+      console.log("🔍 Socket.connected:", codeSocketInstance.connected);
+      console.log("🔍 Socket.id:", codeSocketInstance.id);
+      
+      if (codeSocketInstance.connected && isConnecting) {
+        console.log("⚡ Socket already connected, calling onConnect manually");
+        onConnect();
+      }
+    }, 50);
 
     codeSocketInstance.on("disconnect", (reason) => {
       console.log("❌ Code socket disconnected:", reason);
