@@ -404,6 +404,7 @@ export const SocketProvider = ({ children }) => {
 
     // 🔧 FIX: Track connection state properly
     let isConnecting = true;
+    let hasEmittedJoin = false;
 
     // Connection events
     const onConnect = () => {
@@ -412,26 +413,23 @@ export const SocketProvider = ({ children }) => {
       isConnecting = false;
       setCodeConnectionState("connected");
 
-      // CRITICAL FIX: Use setTimeout to ensure socket is fully ready before emitting
-      setTimeout(() => {
-        if (codeSocketInstance.connected) {
-          console.log(`🎯 Auto-joining session: ${sessionId}`);
-          codeSocketInstance.emit("join-code-session", {
-            sessionId,
-            user: userInfo,
-          });
-        } else {
-          console.error(
-            "❌ Socket disconnected before join-code-session could be emitted",
-          );
-        }
-      }, 100);
+      // CRITICAL FIX: Only emit join once, and ensure socket is ready
+      if (!hasEmittedJoin && codeSocketInstance.connected) {
+        hasEmittedJoin = true;
+        console.log(`🎯 Auto-joining session: ${sessionId}`);
+        codeSocketInstance.emit("join-code-session", {
+          sessionId,
+          user: userInfo,
+        });
+      }
     };
 
+    // Set up connection handler BEFORE checking if connected
+    codeSocketInstance.on("connect", onConnect);
+
+    // If already connected when we set up the handler, call it manually
     if (codeSocketInstance.connected) {
       onConnect();
-    } else {
-      codeSocketInstance.on("connect", onConnect);
     }
 
     codeSocketInstance.on("disconnect", (reason) => {
@@ -450,27 +448,24 @@ export const SocketProvider = ({ children }) => {
       console.log(`✅ Code socket reconnected after ${attemptNumber} attempts`);
       console.log("✅ New Socket ID after reconnect:", codeSocketInstance.id);
       isConnecting = false;
+      hasEmittedJoin = false; // Reset for rejoin
       setCodeConnectionState("connected");
 
-      // CRITICAL FIX: Wait for socket to stabilize before rejoining
-      setTimeout(() => {
-        if (codeSocketInstance.connected) {
-          // Rejoin session on reconnect with fresh socket
-          console.log(`🔄 Rejoining session after reconnect: ${sessionId}`);
-          codeSocketInstance.emit("join-code-session", {
-            sessionId,
-            user: userInfo,
-          });
+      // Rejoin session immediately after reconnect
+      if (codeSocketInstance.connected && !hasEmittedJoin) {
+        hasEmittedJoin = true;
+        console.log(`🔄 Rejoining session after reconnect: ${sessionId}`);
+        codeSocketInstance.emit("join-code-session", {
+          sessionId,
+          user: userInfo,
+        });
 
-          // CRITICAL FIX: Fetch latest session state after reconnection
-          setTimeout(() => {
-            console.log(
-              "🔄 Fetching latest session state after reconnection...",
-            );
-            codeSocketInstance.emit("get-session-info", { sessionId });
-          }, 500);
-        }
-      }, 200);
+        // Fetch latest session state after a brief delay
+        setTimeout(() => {
+          console.log("🔄 Fetching latest session state after reconnection...");
+          codeSocketInstance.emit("get-session-info", { sessionId });
+        }, 500);
+      }
     });
 
     codeSocketInstance.on("reconnect_attempt", (attemptNumber) => {

@@ -70,8 +70,9 @@ const CodeEditor = () => {
 
       const socket = initializeCodeSocket(sessionId);
       if (socket) {
-        setCodeSocket(socket);
+        // CRITICAL: Set up event listeners IMMEDIATELY before any async operations
         setupCodeSocketEvents(socket);
+        setCodeSocket(socket);
       }
 
       return () => {
@@ -86,10 +87,18 @@ const CodeEditor = () => {
   // Update socket state when connection state changes to force re-render
   useEffect(() => {
     if (codeSocket) {
-      console.log("🔄 Connection state changed:", codeConnectionState);
-      console.log("🔄 Socket.connected:", codeSocket.connected);
+      const socketIsConnected = codeSocket.connected;
+      const stateIsConnected = codeConnectionState === "connected";
+
+      console.log("🔄 Connection state changed:", {
+        codeConnectionState,
+        socketConnected: socketIsConnected,
+        sessionJoined: sessionJoinedRef.current,
+        finalIsConnected: socketIsConnected && stateIsConnected,
+      });
+
       // Update connected state based on actual socket
-      setSocketConnected(codeSocket.connected);
+      setSocketConnected(socketIsConnected);
     }
   }, [codeConnectionState, codeSocket]);
 
@@ -152,6 +161,7 @@ const CodeEditor = () => {
       console.log("🎯 Successfully joined session:", data);
       console.log("📝 Received code length:", data.code?.length);
       console.log("🔑 My socket ID from server:", data.mySocketId);
+      console.log("👥 Participants count:", data.participants?.length);
 
       // Store our socket ID from server response for reliable filtering
       if (data.mySocketId) {
@@ -169,6 +179,7 @@ const CodeEditor = () => {
 
       // Mark that we've successfully joined the session room on server
       sessionJoinedRef.current = true;
+      console.log("✅ Session joined ref set to true");
 
       toast.success("Successfully joined collaboration session!");
     });
