@@ -406,6 +406,9 @@ export const SocketProvider = ({ children }) => {
     let isConnecting = true;
     let hasEmittedJoin = false;
 
+    // 🔧 CRITICAL: Set connecting state FIRST, before any event handlers
+    setCodeConnectionState("connecting");
+
     // Connection events
     const onConnect = () => {
       console.log("✅ Connected to code collaboration server");
@@ -473,9 +476,7 @@ export const SocketProvider = ({ children }) => {
       setCodeConnectionState("reconnecting");
     });
 
-    // 🔧 FIX: Set connecting state immediately
-    setCodeConnectionState("connecting");
-
+    // Store the socket instance
     codeSocket.current = codeSocketInstance;
     return codeSocketInstance;
   };
