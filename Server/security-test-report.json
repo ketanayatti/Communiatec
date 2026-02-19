@@ -1,0 +1,174 @@
+{
+  "summary": {
+    "total": 27,
+    "passed": 20,
+    "failed": 7,
+    "successRate": 74.07407407407408
+  },
+  "tests": [
+    {
+      "test": "API Rate Limiting",
+      "status": "FAIL",
+      "details": "Rate limited after 105 requests",
+      "timestamp": "2025-12-21T12:43:29.296Z"
+    },
+    {
+      "test": "Authentication Rate Limiting",
+      "status": "PASS",
+      "details": "Auth rate limited after 5 attempts",
+      "timestamp": "2025-12-21T12:43:34.303Z"
+    },
+    {
+      "test": "XSS Protection (<script>alert(\"xss\")...)",
+      "status": "PASS",
+      "details": "XSS payload sanitized",
+      "timestamp": "2025-12-21T12:43:34.309Z"
+    },
+    {
+      "test": "XSS Protection (<img src=x onerror=a...)",
+      "status": "PASS",
+      "details": "XSS payload sanitized",
+      "timestamp": "2025-12-21T12:43:34.313Z"
+    },
+    {
+      "test": "XSS Protection (javascript:alert(\"xs...)",
+      "status": "PASS",
+      "details": "XSS payload sanitized",
+      "timestamp": "2025-12-21T12:43:34.316Z"
+    },
+    {
+      "test": "XSS Protection (<svg onload=alert(\"x...)",
+      "status": "PASS",
+      "details": "XSS payload sanitized",
+      "timestamp": "2025-12-21T12:43:34.318Z"
+    },
+    {
+      "test": "XSS Protection (\"><script>alert(\"xss...)",
+      "status": "PASS",
+      "details": "XSS payload sanitized",
+      "timestamp": "2025-12-21T12:43:34.320Z"
+    },
+    {
+      "test": "File Upload Security (test.php.jpg)",
+      "status": "PASS",
+      "details": "Upload blocked with error: ENOENT: no such file or directory, open 'D:\\tmp\\test.php.jpg'",
+      "timestamp": "2025-12-21T12:43:34.320Z"
+    },
+    {
+      "test": "File Upload Security (test.exe)",
+      "status": "PASS",
+      "details": "Upload blocked with error: ENOENT: no such file or directory, open 'D:\\tmp\\test.exe'",
+      "timestamp": "2025-12-21T12:43:34.320Z"
+    },
+    {
+      "test": "File Upload Security (test.jpg)",
+      "status": "PASS",
+      "details": "Upload blocked with error: ENOENT: no such file or directory, open 'D:\\tmp\\test.jpg'",
+      "timestamp": "2025-12-21T12:43:34.321Z"
+    },
+    {
+      "test": "File Upload Security (large.jpg)",
+      "status": "PASS",
+      "details": "Upload blocked with error: ENOENT: no such file or directory, open 'D:\\tmp\\large.jpg'",
+      "timestamp": "2025-12-21T12:43:34.323Z"
+    },
+    {
+      "test": "NoSQL Injection Protection ({\"$ne\":null}...)",
+      "status": "PASS",
+      "details": "Injection payload sanitized/blocked",
+      "timestamp": "2025-12-21T12:43:34.325Z"
+    },
+    {
+      "test": "NoSQL Injection Protection ({\"$gt\":\"\"}...)",
+      "status": "PASS",
+      "details": "Injection payload sanitized/blocked",
+      "timestamp": "2025-12-21T12:43:34.327Z"
+    },
+    {
+      "test": "NoSQL Injection Protection ({\"$where\":\"this.email\"}...)",
+      "status": "PASS",
+      "details": "Injection payload sanitized/blocked",
+      "timestamp": "2025-12-21T12:43:34.329Z"
+    },
+    {
+      "test": "NoSQL Injection Protection ({\"$regex\":\".*\"}...)",
+      "status": "PASS",
+      "details": "Injection payload sanitized/blocked",
+      "timestamp": "2025-12-21T12:43:34.331Z"
+    },
+    {
+      "test": "NoSQL Injection Protection ({\"email\":{\"$ne\":null}}...)",
+      "status": "PASS",
+      "details": "Injection payload sanitized/blocked",
+      "timestamp": "2025-12-21T12:43:34.334Z"
+    },
+    {
+      "test": "Security Header (x-frame-options)",
+      "status": "PASS",
+      "details": "Present: DENY",
+      "timestamp": "2025-12-21T12:43:34.336Z"
+    },
+    {
+      "test": "Security Header (x-content-type-options)",
+      "status": "PASS",
+      "details": "Present: nosniff",
+      "timestamp": "2025-12-21T12:43:34.336Z"
+    },
+    {
+      "test": "Security Header (content-security-policy)",
+      "status": "PASS",
+      "details": "Present: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https: wss: ws:; frame-ancestors 'none'; object-src 'none'; base-uri 'self';",
+      "timestamp": "2025-12-21T12:43:34.336Z"
+    },
+    {
+      "test": "Security Header (referrer-policy)",
+      "status": "PASS",
+      "details": "Present: strict-origin-when-cross-origin",
+      "timestamp": "2025-12-21T12:43:34.336Z"
+    },
+    {
+      "test": "Security Header (permissions-policy)",
+      "status": "PASS",
+      "details": "Present: camera=(), microphone=(), geolocation=()",
+      "timestamp": "2025-12-21T12:43:34.336Z"
+    },
+    {
+      "test": "Password Strength (123)",
+      "status": "FAIL",
+      "details": "Weak password accepted",
+      "timestamp": "2025-12-21T12:43:39.343Z"
+    },
+    {
+      "test": "Password Strength (password)",
+      "status": "FAIL",
+      "details": "Weak password accepted",
+      "timestamp": "2025-12-21T12:43:44.359Z"
+    },
+    {
+      "test": "Password Strength (abc123)",
+      "status": "FAIL",
+      "details": "Weak password accepted",
+      "timestamp": "2025-12-21T12:43:49.374Z"
+    },
+    {
+      "test": "Password Strength (111111)",
+      "status": "FAIL",
+      "details": "Weak password accepted",
+      "timestamp": "2025-12-21T12:43:54.382Z"
+    },
+    {
+      "test": "Generic Error Message (nonexistent@test.com)",
+      "status": "FAIL",
+      "details": "Specific error message exposed",
+      "timestamp": "2025-12-21T12:43:54.387Z"
+    },
+    {
+      "test": "Generic Error Message (valid@format.com)",
+      "status": "FAIL",
+      "details": "Specific error message exposed",
+      "timestamp": "2025-12-21T12:43:54.390Z"
+    }
+  ],
+  "timestamp": "2025-12-21T12:43:54.391Z",
+  "target": "http://localhost:4000"
+}
