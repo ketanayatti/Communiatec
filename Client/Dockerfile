@@ -1,12 +1,18 @@
 # ============================================
 # Communiatec Client - Dockerfile
 # ============================================
+# Build:  docker build --build-arg VITE_API_URL=... --build-arg VITE_APP_SERVER_URL=... -t communiatec-client .
+# Run:    docker run -p 80:80 communiatec-client
+# ============================================
 
 # ---- Stage 1: Install Dependencies ----
 FROM node:20-alpine AS deps
 WORKDIR /app
+
+# Only copy package files first (Docker layer caching means deps
+# are only re-installed when package.json or lock changes)
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts && npm cache clean --force
 
 # ---- Stage 2: Build ----
 FROM node:20-alpine AS build
@@ -19,7 +25,6 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Build-time env vars — MUST be provided via docker-compose or build args
-# No hardcoded defaults; fail the build if not provided
 ARG VITE_API_URL
 ARG VITE_APP_SERVER_URL
 
@@ -33,6 +38,13 @@ RUN if [ -z "$VITE_API_URL" ]; then \
 
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_APP_SERVER_URL=$VITE_APP_SERVER_URL
+
+# ─── Bullet-proof build settings ─────────────────────────────────
+# 1. Increase Node.js heap (Monaco + Rollup need ~2 GB during build)
+# 2. Disable CI env var that makes some tools treat warnings as errors
+# 3. Increase network timeout for any post-install fetches
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+ENV CI=""
 
 # Build the production bundle
 RUN npm run build

@@ -7,6 +7,17 @@ pipeline {
         DEPLOY_PATH = "/home/ubuntu/Communiatec"
     }
 
+    options {
+        // Kill the build if it hangs for more than 30 minutes
+        timeout(time: 30, unit: 'MINUTES')
+
+        // Keep last 10 builds to save disk space
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+
+        // Don't allow two builds of the same branch at once
+        disableConcurrentBuilds()
+    }
+
     stages {
 
         stage('Checkout') {
@@ -50,7 +61,7 @@ pipeline {
                     )]) {
 
                         sh """
-                        echo $PASS | docker login -u $USER --password-stdin
+                        echo \$PASS | docker login -u \$USER --password-stdin
                         docker push $DOCKERHUB_USER/communiatec-server:${tag}
                         docker push $DOCKERHUB_USER/communiatec-client:${tag}
                         docker logout
@@ -70,11 +81,25 @@ pipeline {
                     ssh -o StrictHostKeyChecking=no ubuntu@${APP_SERVER} '
                         cd ${DEPLOY_PATH} &&
                         docker compose pull &&
-                        docker compose up -d
+                        docker compose up -d --remove-orphans
                     '
                     """
                 }
             }
+        }
+    }
+
+    // ── Post-build cleanup & notifications ──────────────────────────
+    post {
+        always {
+            // Prune dangling Docker images to prevent disk from filling
+            sh 'docker image prune -f || true'
+        }
+        success {
+            echo "✅ Build #${env.BUILD_NUMBER} succeeded on branch ${env.BRANCH_NAME}"
+        }
+        failure {
+            echo "❌ Build #${env.BUILD_NUMBER} failed on branch ${env.BRANCH_NAME}"
         }
     }
 }
