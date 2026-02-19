@@ -1,7 +1,20 @@
-const winston = require("winston");
-const path = require("path");
+/**
+ * Structured Logger (Winston)
+ * ───────────────────────────
+ * - Respects LOG_LEVEL from env (defaults: debug in dev, info in prod)
+ * - Writes error.log + combined.log to Server/logs/
+ * - Console transport uses colorized output in development
+ * - JSON format in file transports for machine parsing
+ */
 
-// Define log levels
+const winston = require('winston');
+const path = require('path');
+
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const isProduction = NODE_ENV === 'production';
+const LOG_LEVEL = process.env.LOG_LEVEL || (isProduction ? 'info' : 'debug');
+
+// ── Custom levels ─────────────────────────────────────────────────────
 const levels = {
   error: 0,
   warn: 1,
@@ -10,49 +23,93 @@ const levels = {
   debug: 4,
 };
 
-// Define log colors
 const colors = {
-  error: "red",
-  warn: "yellow",
-  info: "green",
-  http: "magenta",
-  debug: "white",
+  error: 'red',
+  warn: 'yellow',
+  info: 'green',
+  http: 'magenta',
+  debug: 'cyan',
 };
 
-// Tell winston that you want to link the colors
 winston.addColors(colors);
 
-// Chose the aspect of your log customizing the log format.
-const format = winston.format.combine(
-  winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss:ms" }),
+// ── Log directory ─────────────────────────────────────────────────────
+const logDir = path.join(__dirname, '..', 'logs');
+
+// ── Formats ───────────────────────────────────────────────────────────
+const consoleFormat = winston.format.combine(
+  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.colorize({ all: true }),
-  winston.format.printf(
-    (info) => `${info.timestamp} ${info.level}: ${info.message}`
-  )
+  winston.format.printf(({ timestamp, level, message, ...meta }) => {
+    const metaStr = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : '';
+    return `${timestamp} ${level}: ${message}${metaStr}`;
+  })
 );
 
-// Define which transports the logger must use to print out messages.
+const fileFormat = winston.format.combine(
+  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+  winston.format.errors({ stack: true }),
+  winston.format.json()
+);
+
+// ── Transports ────────────────────────────────────────────────────────
 const transports = [
-  // Allow the use the console to print the messages
-  new winston.transports.Console(),
-  // Allow to print all the error level messages inside the error.log file
-  new winston.transports.File({
-    filename: path.join(__dirname, "../../logs/error.log"),
-    level: "error",
+  // Console — always active
+  new winston.transports.Console({
+    format: consoleFormat,
   }),
-  // Allow to print all the messages inside the all.log file
+
+  // error.log — errors only
   new winston.transports.File({
-    filename: path.join(__dirname, "../../logs/all.log"),
+    filename: path.join(logDir, 'error.log'),
+    level: 'error',
+    format: fileFormat,
+    maxsize: 5 * 1024 * 1024, // 5 MB rotation
+    maxFiles: 5,
+  }),
+
+  // combined.log — all levels up to LOG_LEVEL
+  new winston.transports.File({
+    filename: path.join(logDir, 'combined.log'),
+    format: fileFormat,
+    maxsize: 10 * 1024 * 1024, // 10 MB rotation
+    maxFiles: 5,
   }),
 ];
 
-// Create the logger instance that has to be exported
-// and used to log messages.
+// ── Create logger ─────────────────────────────────────────────────────
 const logger = winston.createLogger({
-  level: process.env.NODE_ENV === "development" ? "debug" : "warn",
+  level: LOG_LEVEL,
   levels,
-  format,
   transports,
+  // Don't exit on handled errors
+  exitOnError: false,
 });
 
+// ── HTTP request logger middleware ────────────────────────────────────
+// Only active when ENABLE_REQUEST_LOGGING=true (default in dev)
+const requestLoggingEnabled =
+  process.env.ENABLE_REQUEST_LOGGING === 'true' ||
+  (!isProduction && process.env.ENABLE_REQUEST_LOGGING !== 'false');
+
+const httpLogMiddleware = (req, res, next) => {
+  if (!requestLoggingEnabled) return next();
+
+  // Skip noisy health/keepalive/userInfo endpoints
+  const skipPaths = ['/api/health', '/api/keepalive', '/api/auth/userInfo', '/api/maintenance/status'];
+  if (skipPaths.some((p) => req.originalUrl.startsWith(p))) return next();
+
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    logger.http(`${req.method} ${req.originalUrl}`, {
+      status: res.statusCode,
+      duration: `${duration}ms`,
+      ip: req.ip,
+    });
+  });
+  next();
+};
+
 module.exports = logger;
+module.exports.httpLogMiddleware = httpLogMiddleware;
