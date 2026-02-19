@@ -41,8 +41,8 @@ pipeline {
                     def tag = (env.BRANCH_NAME == "main") ? "latest" : "develop-${env.BUILD_NUMBER}"
                     sh """
                     docker build \
-                      --build-arg VITE_API_URL=http://server:4000 \
-                      --build-arg VITE_APP_SERVER_URL=http://server:4000 \
+                      --build-arg VITE_API_URL=/api \
+                      --build-arg VITE_APP_SERVER_URL=/api \
                       -t $DOCKERHUB_USER/communiatec-client:${tag} ./Client
                     """
                 }
