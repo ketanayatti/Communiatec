@@ -12,12 +12,18 @@ dist/
 
 # Environment Variables
 .env
+.env.development
+.env.production
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 Client/.env
+Client/.env.development
+Client/.env.production
 Server/.env
+Server/.env.development
+Server/.env.production
 
 # Logs
 logs

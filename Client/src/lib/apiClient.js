@@ -17,8 +17,8 @@ export const getBaseUrl = () => {
     const port = window.location.port ? `:${window.location.port}` : "";
     return `${protocol}//${hostname}${port}`;
   }
-  // Fallback
-  return "http://localhost:4000";
+  // Fallback to relative URL (env var VITE_API_URL should always be set)
+  return "";
 };
 
 const API_BASE_URL = getBaseUrl();

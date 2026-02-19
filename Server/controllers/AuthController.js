@@ -196,7 +196,10 @@ const logOut = async (req, res) => {
 };
 
 const githubAuth = (req, res) => {
-  const baseUrl = process.env.SERVER_URL || "http://localhost:4000";
+  const baseUrl = process.env.SERVER_URL;
+  if (!baseUrl) {
+    return res.status(500).json({ error: "SERVER_URL environment variable is not configured" });
+  }
   const redirectUri = encodeURIComponent(`${baseUrl}/api/auth/github/callback`);
   const clientId = process.env.GITHUB_CLIENT_ID;
   const githubUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=user:email`;
@@ -264,7 +267,10 @@ const githubCallback = async (req, res) => {
     res.cookie("token", token, cookieOptions);
 
     // Redirect to your frontend app with token in URL for cross-domain auth
-    const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+    const clientUrl = process.env.CLIENT_URL;
+    if (!clientUrl) {
+      return res.status(500).json({ error: "CLIENT_URL environment variable is not configured" });
+    }
     res.redirect(`${clientUrl}/auth?token=${token}&success=true`);
   } catch (err) {
     console.error("GitHub OAuth error:", err);
@@ -273,7 +279,10 @@ const githubCallback = async (req, res) => {
 };
 
 const linkedinAuth = (req, res) => {
-  const baseUrl = process.env.SERVER_URL || "http://localhost:4000";
+  const baseUrl = process.env.SERVER_URL;
+  if (!baseUrl) {
+    return res.status(500).json({ error: "SERVER_URL environment variable is not configured" });
+  }
   const redirectUri = encodeURIComponent(
     `${baseUrl}/api/auth/linkedin/callback`
   );
@@ -293,7 +302,10 @@ const linkedinCallback = async (req, res) => {
     return res.status(400).send("No code provided in callback.");
   }
 
-  const baseUrl = process.env.SERVER_URL || "http://localhost:4000";
+  const baseUrl = process.env.SERVER_URL;
+  if (!baseUrl) {
+    return res.status(500).json({ error: "SERVER_URL environment variable is not configured" });
+  }
   const redirectUri = `${baseUrl}/api/auth/linkedin/callback`;
   try {
     // Exchange code for access token
@@ -346,7 +358,10 @@ const linkedinCallback = async (req, res) => {
     res.cookie("token", token, cookieOptions);
 
     // Redirect to your frontend app with token in URL for cross-domain auth
-    const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+    const clientUrl = process.env.CLIENT_URL;
+    if (!clientUrl) {
+      return res.status(500).json({ error: "CLIENT_URL environment variable is not configured" });
+    }
     res.redirect(`${clientUrl}/auth?token=${token}&success=true`);
   } catch (err) {
     console.error(

@@ -9,7 +9,7 @@ const axios = require("axios");
 const fs = require("fs");
 const FormData = require("form-data");
 
-const BASE_URL = "http://localhost:4000";
+const BASE_URL = process.env.SERVER_URL || process.env.BASE_URL ;
 let testResults = [];
 
 // Test configuration

@@ -1,300 +1,312 @@
-const express = require("express");
-const dbConnect = require("./config/database");
-const cookieParser = require("cookie-parser");
-const cors = require("cors");
-const http = require("http");
-const path = require("path");
-const { Server } = require("socket.io");
+// ═══════════════════════════════════════════════════════════════════════
+// Communiatec Server — Production-Ready Entry Point
+// ═══════════════════════════════════════════════════════════════════════
+//
+// Boot order:
+//   1. Load & validate environment (fail-fast on missing critical vars)
+//   2. Initialise Express + security middleware
+//   3. Mount API routes
+//   4. Create HTTP server & Socket.io
+//   5. Connect database (fail-fast in production)
+//   6. Listen
+//
+// ═══════════════════════════════════════════════════════════════════════
 
-// ✨ FIXED: Import all routes and socket handlers
-const codeRoutes = require("./routes/codeRoutes");
-const handleCodeCollaboration = require("./socket-handlers/codeSocket");
-const handleGroupSocket = require("./socket-handlers/groupSocket");
-const AuthRoute = require("./routes/AuthRoute");
-const ContactRoutes = require("./routes/ContactRoutes");
-const messageRoutes = require("./routes/messageRoutes");
-const profileRoute = require("./routes/profileRoute");
-const adminRoutes = require("./routes/adminRoutes");
-const setupSocket = require("./socket");
-const groupRoutes = require("./routes/groupRoutes");
-const Setting = require("./models/SettingModel"); // Import Setting model for maintenance status
+// ── 1. Environment — MUST be first ───────────────────────────────────
+const { NODE_ENV, isProduction, isDevelopment, PORT } = require('./config/env');
 
-require("dotenv").config();
+// ── 2. Core dependencies ─────────────────────────────────────────────
+const express = require('express');
+const cookieParser = require('cookie-parser');
+const cors = require('cors');
+const http = require('http');
+const path = require('path');
+const { Server } = require('socket.io');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
-const app = express();
+// ── Internal modules ──────────────────────────────────────────────────
+const logger = require('./utils/logger');
+const { httpLogMiddleware } = require('./utils/logger');
+const dbConnect = require('./config/database');
+const Setting = require('./models/SettingModel');
 
-// Behind Render/other proxies, trust the first proxy so req.ip reflects the real client
-app.set("trust proxy", 1);
+// Routes
+const AuthRoute = require('./routes/AuthRoute');
+const ContactRoutes = require('./routes/ContactRoutes');
+const messageRoutes = require('./routes/messageRoutes');
+const profileRoute = require('./routes/profileRoute');
+const adminRoutes = require('./routes/adminRoutes');
+const codeRoutes = require('./routes/codeRoutes');
+const groupRoutes = require('./routes/groupRoutes');
 
-// 🛠️ Global maintenance mode middleware (must be before API routes)
-const maintenanceMiddleware = require("./middlewares/MaintenanceMiddleware");
-// ✨ ENHANCED SECURITY: Comprehensive security middleware setup
-const helmet = require("helmet");
+// Socket handlers
+const setupChatSocket = require('./socket');
+const handleCodeCollaboration = require('./socket-handlers/codeSocket');
+const handleGroupSocket = require('./socket-handlers/groupSocket');
+
+// Middleware
+const maintenanceMiddleware = require('./middlewares/MaintenanceMiddleware');
 const {
   xssProtection,
   mongoSanitize,
   hpp,
   authLimiter,
-  uploadLimiter,
-  apiLimiter,
   validateInput,
   securityHeaders,
-  validateFileUpload,
-} = require("./middlewares/securityMiddleware");
+} = require('./middlewares/securityMiddleware');
 const {
   securityAuditMiddleware,
   checkSessionSecurity,
-} = require("./middlewares/securityAudit");
+} = require('./middlewares/securityAudit');
 
-// Basic middleware setup
-app.use(express.json({ limit: "10mb" })); // Limit body size
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+// ═══════════════════════════════════════════════════════════════════════
+// EXPRESS APP
+// ═══════════════════════════════════════════════════════════════════════
+const app = express();
+
+// Trust first proxy (Render, Nginx, etc.)
+app.set('trust proxy', 1);
+
+// ── Body parsing ──────────────────────────────────────────────────────
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
-// Configure CORS EARLY so even early responses (e.g., 429) include headers
-// Configure CORS
-let allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || "")
-  .split(",")
-  .map((origin) => origin.trim())
+// ── HTTP request logging ──────────────────────────────────────────────
+app.use(httpLogMiddleware);
+
+// ═══════════════════════════════════════════════════════════════════════
+// CORS CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════
+
+let allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((o) => o.trim())
   .filter(Boolean);
 
-// Sensible defaults for production if not explicitly configured
-if (allowedOrigins.length === 0) {
-  const defaults = [
-    process.env.CLIENT_URL,
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:3000",
-    "https://communiatec.vercel.app",
-    "http://3.226.122.22",
-  ].filter(Boolean);
-  allowedOrigins = Array.from(new Set(defaults));
+//  FAIL-FAST: In production, CORS origins MUST be explicitly configured
+if (isProduction && allowedOrigins.length === 0) {
+  logger.error('');
+  logger.error('══════════════════════════════════════════════════════');
+  logger.error('  ❌ FATAL: CORS_ALLOWED_ORIGINS is empty in production');
+  logger.error('  Set it to your client domain(s), comma-separated.');
+  logger.error('══════════════════════════════════════════════════════');
+  process.exit(1);
 }
-// Optional: allow Vercel preview deployments if enabled
-const allowVercelPreviews =
-  String(process.env.ALLOW_VERCEL_PREVIEWS || "true") === "true";
 
-console.log("🔍 CORS Configuration:", {
-  CORS_ALLOWED_ORIGINS: process.env.CORS_ALLOWED_ORIGINS,
-  parsedOrigins: allowedOrigins,
+// Development fallback (never in production)
+if (!isProduction && allowedOrigins.length === 0) {
+  allowedOrigins = [
+    process.env.CLIENT_URL,
+    process.env.SERVER_URL,
+  ].filter(Boolean);
+  if (allowedOrigins.length === 0) {
+    logger.error('❌ No CORS origins configured. Set CORS_ALLOWED_ORIGINS in your .env.development file.');
+    process.exit(1);
+  }
+  logger.warn('⚠️  CORS_ALLOWED_ORIGINS not set — falling back to CLIENT_URL/SERVER_URL:', { origins: allowedOrigins });
+}
+
+// Allow Vercel preview deployments
+const allowVercelPreviews = String(process.env.ALLOW_VERCEL_PREVIEWS || 'true') === 'true';
+
+logger.info('🔍 CORS Configuration:', {
+  origins: allowedOrigins,
   allowVercelPreviews,
+  environment: NODE_ENV,
 });
+
+const isOriginAllowed = (origin) => {
+  if (!origin) return true; // Allow non-browser requests (curl, mobile apps)
+  if (allowedOrigins.includes(origin)) return true;
+  if (allowVercelPreviews && /https?:\/\/[a-z0-9-]+\.[a-z0-9-]+\.vercel\.app$/i.test(origin)) {
+    return true;
+  }
+  return false;
+};
 
 const corsOptions = {
   origin: (origin, callback) => {
-    const isAllowedExplicit = !!origin && allowedOrigins.includes(origin);
-    const isVercelPreview =
-      !!origin &&
-      allowVercelPreviews &&
-      /https?:\/\/[a-z0-9-]+\.[a-z0-9-]+\.vercel\.app$/i.test(origin);
-
-    console.log("🌐 CORS Check:", {
-      requestOrigin: origin,
-      allowedOrigins,
-      isAllowedExplicit,
-      isVercelPreview,
-    });
-
-    // Allow requests with no origin like mobile apps or curl
-    if (!origin) return callback(null, true);
-    if (isAllowedExplicit || isVercelPreview) {
+    if (isOriginAllowed(origin)) {
       return callback(null, true);
     }
-    return callback(new Error(`Not allowed by CORS: ${origin}`)); // block other origins
+    logger.warn('🚫 CORS blocked:', { origin });
+    return callback(new Error(`Not allowed by CORS: ${origin}`));
   },
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   credentials: true,
   allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "X-Requested-With",
-    "Accept",
-    "Cookie",
-    "Origin",
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'Cookie',
+    'Origin',
   ],
 };
 
 app.use(cors(corsOptions));
-// Handle preflight requests
-app.options("*", cors(corsOptions));
+app.options('*', cors(corsOptions));
 
-// Enhanced CORS headers middleware for better reliability
+// Manual CORS headers for reliability (especially error responses)
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-
-  // Always set CORS headers for allowed origins
-  const isAllowedExplicit = !!origin && allowedOrigins.includes(origin);
-  const isVercelPreview =
-    !!origin &&
-    allowVercelPreviews &&
-    /https?:\/\/[a-z0-9-]+\.[a-z0-9-]+\.vercel\.app$/i.test(origin);
-  if (!origin || isAllowedExplicit || isVercelPreview) {
-    // Never use * when credentials are enabled
+  if (isOriginAllowed(origin)) {
+    res.header('Access-Control-Allow-Origin', origin || allowedOrigins[0] || process.env.CLIENT_URL);
+    res.header('Vary', 'Origin');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.header(
-      "Access-Control-Allow-Origin",
-      origin || "http://localhost:5173",
+      'Access-Control-Allow-Headers',
+      'Content-Type, Authorization, X-Requested-With, Accept, Cookie, Set-Cookie, Origin'
     );
-    res.header("Vary", "Origin");
-    res.header(
-      "Access-Control-Allow-Methods",
-      "GET, POST, PUT, DELETE, OPTIONS",
-    );
-    res.header(
-      "Access-Control-Allow-Headers",
-      "Content-Type, Authorization, X-Requested-With, Accept, Cookie, Set-Cookie, Origin",
-    );
-    res.header("Access-Control-Allow-Credentials", "true");
-    res.header("Access-Control-Expose-Headers", "Set-Cookie");
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Expose-Headers', 'Set-Cookie');
   }
-
-  // Handle preflight requests immediately
-  if (req.method === "OPTIONS") {
-    return res.status(204).end();
-  }
-
+  if (req.method === 'OPTIONS') return res.status(204).end();
   next();
 });
 
-// ✨ COMPREHENSIVE SECURITY MIDDLEWARE
+// ═══════════════════════════════════════════════════════════════════════
+// SECURITY MIDDLEWARE
+// ═══════════════════════════════════════════════════════════════════════
+
 app.use(
   helmet({
-    contentSecurityPolicy: false, // We'll handle CSP in our custom middleware
+    contentSecurityPolicy: false, // Handled by custom securityHeaders
     crossOriginEmbedderPolicy: false,
-  }),
+  })
 );
 
-// Input sanitization and validation
-app.use(mongoSanitize()); // Prevent NoSQL injection
-app.use(hpp()); // Prevent HTTP Parameter Pollution
-app.use(xssProtection); // Custom XSS protection
-app.use(validateInput); // Enhanced input validation
-app.use(securityHeaders); // Custom security headers
-app.use(securityAuditMiddleware); // Security event logging
+app.use(mongoSanitize());
+app.use(hpp());
+app.use(xssProtection);
+app.use(validateInput);
+app.use(securityHeaders);
+app.use(securityAuditMiddleware);
 
-// Rate limiting
-// Use a custom general API limiter that is proxy-aware and skips preflight/status/auth-info
-const rateLimit = require("express-rate-limit");
+// ── Rate limiting ─────────────────────────────────────────────────────
 const generalApiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 300, // more generous to avoid false 429 spikes from shared IPs
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 300,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.ip, // respects trust proxy
+  keyGenerator: (req) => req.ip,
   skip: (req) =>
-    req.method === "OPTIONS" ||
-    req.originalUrl.startsWith("/api/maintenance/status") ||
-    req.originalUrl.startsWith("/api/auth/userInfo") ||
-    req.originalUrl.startsWith("/api/health") ||
-    req.originalUrl.startsWith("/api/keepalive"),
-  message: {
-    error: "API rate limit exceeded",
-    retryAfter: 15 * 60,
-  },
+    req.method === 'OPTIONS' ||
+    req.originalUrl.startsWith('/api/maintenance/status') ||
+    req.originalUrl.startsWith('/api/auth/userInfo') ||
+    req.originalUrl.startsWith('/api/health') ||
+    req.originalUrl.startsWith('/api/keepalive'),
+  message: { error: 'API rate limit exceeded', retryAfter: 15 * 60 },
 });
-app.use("/api", generalApiLimiter);
-app.use("/api/auth/login", authLimiter); // Stricter auth rate limit
-app.use("/api/auth/github", authLimiter);
-app.use("/api/auth/linkedin", authLimiter);
 
-// Static file serving
+app.use('/api', generalApiLimiter);
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/github', authLimiter);
+app.use('/api/auth/linkedin', authLimiter);
+
+// ── Static files ──────────────────────────────────────────────────────
 app.use(
-  "/uploads/profile-images",
-  express.static(path.join(__dirname, "uploads/profile-images")),
+  '/uploads/profile-images',
+  express.static(path.join(__dirname, 'uploads/profile-images'))
 );
 
-// Maintenance status endpoint (must be before maintenance middleware)
-app.get("/api/maintenance/status", async (req, res) => {
+// ═══════════════════════════════════════════════════════════════════════
+// PRE-ROUTE ENDPOINTS (bypass maintenance)
+// ═══════════════════════════════════════════════════════════════════════
+
+// Maintenance status
+app.get('/api/maintenance/status', async (req, res) => {
   try {
-    // Check if DB is connected before querying
-    const mongoose = require("mongoose");
+    const mongoose = require('mongoose');
     if (mongoose.connection.readyState !== 1) {
-      console.warn("⚠️ DB not connected, returning default maintenance status");
       return res.json({
         maintenanceMode: false,
         timestamp: new Date().toISOString(),
-        server: "online",
-        warning: "database_disconnected",
+        server: 'online',
+        warning: 'database_disconnected',
       });
     }
-
     const settings = await Setting.findOne();
-    console.log("📋 Maintenance status checked at:", new Date().toISOString());
     res.json({
       maintenanceMode: settings?.maintenanceMode || false,
       timestamp: new Date().toISOString(),
-      server: "online",
+      server: 'online',
     });
   } catch (err) {
-    console.error("Error fetching maintenance status:", err);
+    logger.error('Error fetching maintenance status:', { error: err.message });
     res.json({
       maintenanceMode: false,
       timestamp: new Date().toISOString(),
-      server: "online",
+      server: 'online',
     });
   }
 });
 
-// Keepalive endpoint to prevent Render from sleeping
-app.get("/api/keepalive", (req, res) => {
-  console.log("🏃‍♂️ Keepalive ping received at:", new Date().toISOString());
+// Keepalive
+app.get('/api/keepalive', (req, res) => {
+  logger.debug('Keepalive ping received');
   res.json({
-    status: "alive",
+    status: 'alive',
     timestamp: new Date().toISOString(),
     uptime: Math.floor(process.uptime()),
-    memory: process.memoryUsage(),
-    server: "Communiatec Backend",
+    server: 'Communiatec Backend',
   });
 });
 
-// ✨ CRITICAL FIX: Apply maintenance middleware BEFORE API routes
-app.use("/api", maintenanceMiddleware);
-
-// ✨ NOW apply your API routes (maintenance middleware will check them)
-app.use("/api/auth", AuthRoute);
-app.use("/api", checkSessionSecurity, profileRoute); // Add session security check
-app.use("/api/contact", ContactRoutes);
-app.use("/api/message", checkSessionSecurity, messageRoutes); // Add session security check
-app.use("/api/admin", checkSessionSecurity, adminRoutes); // Add session security check
-app.use("/api/code", checkSessionSecurity, codeRoutes); // Add session security check
-app.use("/api/groups", checkSessionSecurity, groupRoutes); // Add session security check
-app.use("/api/gemini", require("./routes/geminiRoutes"));
-app.use(
-  "/api/message-suggestions",
-  require("./routes/messageSuggestionRoutes"),
-);
-app.use("/api/ai-suggestions", require("./routes/aiSuggestionRoutes"));
-app.use("/api/zoro", require("./routes/zoroRoutes"));
-
-// Health check endpoint (bypasses maintenance in the middleware itself)
-app.get("/api/health", (req, res) => {
-  const mongoose = require("mongoose");
+// Health check
+app.get('/api/health', (req, res) => {
+  const mongoose = require('mongoose');
   const dbState = mongoose.connection.readyState;
-  const dbStatus = {
-    0: "disconnected",
-    1: "connected",
-    2: "connecting",
-    3: "disconnecting",
-  };
+  const dbStatus = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
 
   res.json({
-    status: "OK",
+    status: 'OK',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    environment: process.env.NODE_ENV || "development",
+    environment: NODE_ENV,
     services: {
-      database: dbStatus[dbState] || "unknown",
-      redis: "not configured",
-      code_collaboration: "enabled",
+      database: dbStatus[dbState] || 'unknown',
+      redis: require('./utils/redisClient').isReady ? 'connected' : 'in-memory-fallback',
+      code_collaboration: 'enabled',
     },
   });
 });
 
-// Rest of your server setup remains the same...
-// ✨ ENHANCED: Error handling middleware
-const logger = require("./utils/logger");
+// ═══════════════════════════════════════════════════════════════════════
+// MAINTENANCE MIDDLEWARE + API ROUTES
+// ═══════════════════════════════════════════════════════════════════════
 
-app.use((err, req, res, next) => {
-  logger.error("🚨 Server Error:", {
+app.use('/api', maintenanceMiddleware);
+
+app.use('/api/auth', AuthRoute);
+app.use('/api', checkSessionSecurity, profileRoute);
+app.use('/api/contact', ContactRoutes);
+app.use('/api/message', checkSessionSecurity, messageRoutes);
+app.use('/api/admin', checkSessionSecurity, adminRoutes);
+app.use('/api/code', checkSessionSecurity, codeRoutes);
+app.use('/api/groups', checkSessionSecurity, groupRoutes);
+app.use('/api/gemini', require('./routes/geminiRoutes'));
+app.use('/api/message-suggestions', require('./routes/messageSuggestionRoutes'));
+app.use('/api/ai-suggestions', require('./routes/aiSuggestionRoutes'));
+app.use('/api/zoro', require('./routes/zoroRoutes'));
+
+// ═══════════════════════════════════════════════════════════════════════
+// ERROR HANDLING
+// ═══════════════════════════════════════════════════════════════════════
+
+// 404 for unknown API routes
+app.use('/api/*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `API endpoint not found: ${req.method} ${req.originalUrl}`,
+  });
+});
+
+// Global error handler
+app.use((err, req, res, _next) => {
+  logger.error('Server Error:', {
     error: err.message,
     stack: err.stack,
     url: req.url,
@@ -302,54 +314,25 @@ app.use((err, req, res, next) => {
     ip: req.ip,
   });
 
-  // Don't leak error details in production
-  const isDevelopment = process.env.NODE_ENV === "development";
-
   res.status(err.status || 500).json({
     success: false,
-    message: isDevelopment ? err.message : "Internal server error",
+    message: isDevelopment ? err.message : 'Internal server error',
     ...(isDevelopment && { stack: err.stack }),
   });
 });
 
-// ✨ ENHANCED: 404 handler for API routes
-app.use("/api/*", (req, res) => {
-  res.status(404).json({
-    success: false,
-    message: `API endpoint not found: ${req.method} ${req.originalUrl}`,
-    availableEndpoints: [
-      "GET /api/health",
-      "POST /api/auth/login",
-      "GET /api/auth/userInfo",
-      "POST /api/code/create-session",
-      "GET /api/code/join/:sessionId",
-      "POST /api/code/execute",
-    ],
-  });
-});
+// ═══════════════════════════════════════════════════════════════════════
+// HTTP SERVER + SOCKET.IO
+// ═══════════════════════════════════════════════════════════════════════
 
-// Create HTTP server
 const server = http.createServer(app);
-
-/// Server/server.js - Updated sections only
-
-// Replace the existing socket setup section with this:
-
-// ✨ ENHANCED: Socket.io configuration with better error handling
-const socketAllowedOrigins = [
-  "http://localhost:3000",
-  "http://localhost:5173",
-  "http://localhost:5174",
-  ...allowedOrigins,
-];
 
 const io = new Server(server, {
   cors: {
-    origin: socketAllowedOrigins,
-    methods: ["GET", "POST"],
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
     credentials: true,
   },
-  // ✨ Enhanced socket.io options
   pingTimeout: 60000,
   pingInterval: 25000,
   upgradeTimeout: 30000,
@@ -359,186 +342,169 @@ const io = new Server(server, {
   allowEIO3: true,
 });
 
-// Make io globally accessible for controllers
+// Global references for controllers
 global.io = io;
+app.set('io', io);
 
-// ✨ ENHANCED: Socket error handling
-io.engine.on("connection_error", (err) => {
-  console.error("🚨 Socket.io connection error:", {
+io.engine.on('connection_error', (err) => {
+  logger.error('Socket.io connection error:', {
     message: err.message,
-    description: err.description,
-    context: err.context,
     type: err.type,
-    timestamp: new Date().toISOString(),
   });
 });
 
-// Make io and userSocketMap available to app
-app.set("io", io);
+// ═══════════════════════════════════════════════════════════════════════
+// SOCKET INITIALIZATION — SINGLE io.on("connection") HANDLER
+// ═══════════════════════════════════════════════════════════════════════
+//
+// BEFORE (3 separate io.on("connection") — race conditions & duplicate maps):
+//   1. setupSocket(io)   → own userSocketMap + io.on("connection")
+//   2. server.js L387    → second userSocketMap + io.on("connection") + groupSocket
+//   3. server.js L421    → third io.on("connection") for logging
+//
+// AFTER (unified):
+//   - setupChatSocket handles its own namespace internally (DM, reactions, typing)
+//   - We register ONE connection handler for group + monitoring
+//   - Code collaboration uses its own /code namespace (no conflict)
 
-// Setup existing chat socket (your existing socket handling) - MAIN NAMESPACE
-setupSocket(io);
+// 1) Chat socket (DMs, reactions, read receipts) — registers its own io.on("connection")
+setupChatSocket(io);
 
-// Setup Group Chat Socket
+// 2) Code collaboration — isolated /code namespace
 try {
-  const userSocketMap = new Map();
-  // 🌐 Make user-socket map globally accessible so REST routes can emit socket events
+  handleCodeCollaboration(io);
+  logger.info('✅ Code collaboration socket initialized on /code namespace');
+} catch (error) {
+  logger.error('❌ Failed to initialize code collaboration:', { error: error.message });
+  if (isProduction) process.exit(1);
+}
+
+// 3) Group chat — piggyback on the chat socket's connection
+//    NOTE: setupChatSocket (socket.js) already creates its own userSocketMap.
+//    We reuse io.userSocketMap set by socket.js instead of creating a duplicate.
+
+// Wait for socket.js to register, then add group handlers
+io.on('connection', (socket) => {
+  const userId = socket.handshake.query.userId;
+
+  // Use the userSocketMap from socket.js (set as io.userSocketMap)
+  const userSocketMap = io.userSocketMap || global.chatUserSocketMap || new Map();
   global.userSocketMap = userSocketMap;
-  app.set("userSocketMap", userSocketMap);
+  app.set('userSocketMap', userSocketMap);
 
-  io.on("connection", (socket) => {
-    const userId = socket.handshake.query.userId;
-    if (userId) {
-      userSocketMap.set(userId, socket.id);
-    }
+  // Group socket handler
+  handleGroupSocket(io, socket, userSocketMap);
 
-    handleGroupSocket(io, socket, userSocketMap);
-
-    socket.on("disconnect", () => {
-      if (userId) {
-        userSocketMap.delete(userId);
-      }
-    });
-  });
-  console.log("✅ Group chat socket handlers initialized");
-} catch (error) {
-  console.error("🚨 Error initializing group chat socket handlers:", error);
-}
-
-// ✨ FIXED: Setup Code Collaboration Socket on /code namespace
-try {
-  // handleCodeCollaboration sets up its own connection handlers internally
-  const codeNamespace = handleCodeCollaboration(io);
-  console.log(
-    "✅ Code collaboration socket handlers initialized on /code namespace",
-  );
-
-
-} catch (error) {
-  console.error("❌ Failed to initialize code collaboration:", error.message);
-  console.error(error.stack);
-}
-
-// ✨ ENHANCED: Connection monitoring for MAIN namespace only
-io.on("connection", (socket) => {
-  console.log(
-    `👤 Chat client connected: ${socket.id} from ${socket.handshake.address}`,
-  );
-
-  socket.on("disconnect", (reason) => {
-    console.log(`👋 Chat client disconnected: ${socket.id}, reason: ${reason}`);
+  // Connection logging (debug level — suppressed in production)
+  logger.debug(`👤 Client connected: ${socket.id}`, {
+    userId: userId || 'anonymous',
+    ip: socket.handshake.address,
   });
 
-  socket.on("error", (error) => {
-    console.error(`🚨 Chat socket error for ${socket.id}:`, error);
+  socket.on('disconnect', (reason) => {
+    logger.debug(`👋 Client disconnected: ${socket.id}`, { reason });
+  });
+
+  socket.on('error', (error) => {
+    logger.error(`Socket error for ${socket.id}:`, { error: error.message });
   });
 });
 
-// Rest of your server setup remains the same...
+logger.info('✅ All socket handlers initialized');
 
-// Connect to database
-// dbConnect(); // Moved to startServer
-
-// ✨ ENHANCED: Server startup with better logging
-const PORT = process.env.PORT || 4000;
+// ═══════════════════════════════════════════════════════════════════════
+// SERVER START
+// ═══════════════════════════════════════════════════════════════════════
 
 const startServer = async () => {
-  // Attempt database connection but don't block server start on failure
+  // Database — fail-fast in production (handled inside dbConnect)
   await dbConnect();
 
   server.listen(PORT, () => {
-    console.log("🚀 Communiatec Server Started!");
-    console.log("=".repeat(50));
-    console.log(`📡 Server running on: http://localhost:${PORT}`);
-    console.log(`💬 Chat API: http://localhost:${PORT}/api/message`);
-    console.log(`👤 Auth API: http://localhost:${PORT}/api/auth`);
-    console.log(`💻 Code Collaboration: http://localhost:${PORT}/api/code`);
-    console.log(`🏥 Health Check: http://localhost:${PORT}/api/health`);
-    console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
-    console.log(`🔌 Socket.io enabled for real-time features`);
-    console.log("=".repeat(50));
+    const serverHost = process.env.SERVER_URL || `http://0.0.0.0:${PORT}`;
 
-    // Start keepalive mechanism for Render free tier
-    if (process.env.NODE_ENV === "production") {
-      console.log("🏃‍♂️ Starting server keepalive mechanism...");
+    logger.info('═'.repeat(50));
+    logger.info('🚀 Communiatec Server Started!');
+    logger.info(`📡 Server     : ${serverHost}`);
+    logger.info(`🌍 Environment: ${NODE_ENV}`);
+    logger.info(`🔌 Port       : ${PORT}`);
+    logger.info(`📝 Log level  : ${process.env.LOG_LEVEL || (isProduction ? 'info' : 'debug')}`);
+    logger.info('═'.repeat(50));
 
-      // Self-ping every 10 minutes to prevent sleep (Render sleeps after 15 minutes)
-      const keepAliveInterval = setInterval(
-        () => {
-          const serverUrl =
-            process.env.SERVER_URL || `http://localhost:${PORT}`;
+    // Keepalive self-ping for Render free tier (production only)
+    if (isProduction && process.env.SERVER_URL) {
+      const keepAliveInterval = setInterval(() => {
+        http
+          .get(`${process.env.SERVER_URL}/api/keepalive`, (res) => {
+            res.resume();
+            if (res.statusCode === 200) {
+              logger.debug('Keepalive ping successful');
+            }
+          })
+          .on('error', (err) => {
+            logger.warn('Keepalive ping failed:', { error: err.message });
+          });
+      }, 10 * 60 * 1000); // 10 minutes
 
-          // Use native http to ping our own server (no dependencies required)
-          http
-            .get(`${serverUrl}/api/keepalive`, (res) => {
-              // Consume response data to free up memory
-              res.resume();
-              if (res.statusCode === 200) {
-                console.log("✅ Keepalive ping successful");
-              } else {
-                console.log(
-                  `⚠️ Keepalive ping returned status: ${res.statusCode}`,
-                );
-              }
-            })
-            .on("error", (error) => {
-              console.log("⚠️ Keepalive ping failed:", error.message);
-            });
-        },
-        10 * 60 * 1000,
-      ); // 10 minutes
-
-      // Clear interval on server shutdown
-      process.on("SIGTERM", () => {
-        clearInterval(keepAliveInterval);
-      });
-
-      process.on("SIGINT", () => {
-        clearInterval(keepAliveInterval);
-      });
+      // Cleanup on shutdown
+      const clearKeepAlive = () => clearInterval(keepAliveInterval);
+      process.on('SIGTERM', clearKeepAlive);
+      process.on('SIGINT', clearKeepAlive);
     }
+  });
+
+  // Handle port-in-use error (fail-fast)
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      logger.error(`❌ FATAL: Port ${PORT} is already in use.`);
+      process.exit(1);
+    }
+    throw err;
   });
 };
 
 startServer();
 
-// ✨ ENHANCED: Graceful shutdown handling
-process.on("SIGTERM", () => {
-  console.log("📤 SIGTERM received, shutting down gracefully...");
+// ═══════════════════════════════════════════════════════════════════════
+// GRACEFUL SHUTDOWN
+// ═══════════════════════════════════════════════════════════════════════
+
+const gracefulShutdown = (signal) => {
+  logger.info(`📤 ${signal} received — shutting down gracefully...`);
+
   server.close(() => {
-    console.log("✅ Server closed");
-    process.exit(0);
+    const mongoose = require('mongoose');
+    mongoose.connection.close(false).then(() => {
+      logger.info('✅ Database connection closed.');
+      logger.info('✅ Server shut down cleanly.');
+      process.exit(0);
+    });
+  });
+
+  // Force kill after 10s if graceful shutdown hangs
+  setTimeout(() => {
+    logger.error('⚠️  Graceful shutdown timed out. Forcing exit.');
+    process.exit(1);
+  }, 10000);
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// ── Unhandled errors ──────────────────────────────────────────────────
+process.on('unhandledRejection', (reason) => {
+  logger.error('🚨 Unhandled Promise Rejection:', {
+    reason: reason instanceof Error ? reason.message : reason,
+    stack: reason instanceof Error ? reason.stack : undefined,
   });
 });
 
-process.on("SIGINT", () => {
-  console.log("📤 SIGINT received, shutting down gracefully...");
-  server.close(() => {
-    console.log("✅ Server closed");
-    process.exit(0);
-  });
-});
-
-// ✨ ENHANCED: Unhandled error catching
-process.on("unhandledRejection", (reason, promise) => {
-  console.error("🚨 Unhandled Promise Rejection:", {
-    reason: reason,
-    promise: promise,
-    timestamp: new Date().toISOString(),
-  });
-});
-
-process.on("uncaughtException", (error) => {
-  console.error("🚨 Uncaught Exception:", {
+process.on('uncaughtException', (error) => {
+  logger.error('🚨 Uncaught Exception:', {
     error: error.message,
     stack: error.stack,
-    timestamp: new Date().toISOString(),
   });
-
-  // Graceful shutdown on uncaught exception
-  server.close(() => {
-    process.exit(1);
-  });
+  gracefulShutdown('uncaughtException');
 });
 
-module.exports = app; // Export for testing
+module.exports = app;
